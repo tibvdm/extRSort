@@ -1,10 +1,8 @@
 use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
-use std::rc::Rc;
 
 use threadpool::ThreadPool;
 
 use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, ChunkLine}, Configuration};
-use crate::chunk::Chunk;
 
 pub fn merge(
     files: Vec<ClosedTmpFile>, 
@@ -67,41 +65,25 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
         .map(|file| Chunks::new(file, 8_000))
         .collect();
 
-    let mut current_chunks: Vec<Option<Chunk>> = chunk_iterators
+    let current_chunks: Vec<ChunkLine> = chunk_iterators
         .iter_mut()
-        .map(|ci| ci.next())
+        .enumerate()
+        .map(|(i, ci)| ChunkLine::new(ci.next(), 0, i))
         .collect();
 
-    let mut line_indices = vec![0; current_chunks.len()];
+    let mut heap: BinaryHeap<ChunkLine> = BinaryHeap::from(current_chunks);
 
-    let mut heap: BinaryHeap<ChunkLine> = BinaryHeap::new();
-    for i in 0..current_chunks.len() {
-        heap.push(ChunkLine::new(current_chunks[i].as_ref().unwrap().lines().get(0).unwrap(), i))
-    }
+    while let Some(smallest) = heap.pop() {
+        smallest.current_line().unwrap().write(file);
 
-    while !heap.is_empty() {
-        let smallest = heap.pop().unwrap();
-
-        smallest.line.write(file);
-
-        let smallest_index = line_indices[smallest.iterator_index] + 1;
-        if smallest_index >= current_chunks[smallest.iterator_index].as_ref().unwrap().len() {
-            current_chunks[smallest.iterator_index] = chunk_iterators[smallest.iterator_index].next();
-            line_indices[smallest.iterator_index] = 0;
-            if current_chunks[smallest.iterator_index].is_some() {
-                heap.push(ChunkLine::new(
-                    current_chunks[smallest.iterator_index].as_ref().unwrap().lines().get(0).unwrap(),
-                    smallest.iterator_index
-                ));
+        let smallest_index = smallest.line_index + 1;
+        if smallest_index >= smallest.chunk.as_ref().unwrap().len() {
+            let new_chunk = chunk_iterators[smallest.iterator_index].next();
+            if new_chunk.is_some() {
+                heap.push(ChunkLine::new(new_chunk, 0, smallest.iterator_index));
             }
-        }
-
-        else {
-            line_indices[smallest.iterator_index] = smallest_index;
-            heap.push(ChunkLine::new(
-                current_chunks[smallest.iterator_index].as_ref().unwrap().lines().get(smallest_index).unwrap(),
-                smallest.iterator_index
-            ));
+        } else {
+            heap.push(ChunkLine::new(smallest.chunk, smallest_index, smallest.iterator_index));
         }
     }
 

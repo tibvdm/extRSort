@@ -6,35 +6,44 @@ pub use iter::Chunks;
 
 use crate::line::Line;
 
-pub struct ChunkLine<'a> {
-    pub line: &'a Line<'a>,
+pub struct ChunkLine {
+    pub chunk: Option<Chunk>,
+    pub line_index: usize,
     pub iterator_index: usize
 }
 
-impl<'a> ChunkLine<'a> {
-    pub fn new(line: &'a Line<'a>, iterator_index: usize) -> Self {
-        ChunkLine { line, iterator_index }
+impl ChunkLine {
+    pub fn new(chunk: Option<Chunk>, line_index: usize, iterator_index: usize) -> Self {
+        ChunkLine { chunk, line_index, iterator_index }
     }
 
+    pub fn current_line(&self) -> Option<&Line> {
+        if let Some(chunk) = self.chunk.as_ref() {
+            return chunk.lines().get(self.line_index);
+        }
 
+        None
+    }
 }
 
-impl<'a> PartialEq for ChunkLine<'a> {
+impl PartialEq for ChunkLine {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == std::cmp::Ordering::Equal
     }
 }
 
-impl<'a> PartialOrd for ChunkLine<'a> {
+impl PartialOrd for ChunkLine {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a> Eq for ChunkLine<'a> {}
+impl Eq for ChunkLine {}
 
-impl<'a> Ord for ChunkLine<'a> {
+impl Ord for ChunkLine {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.line.cmp(self.line)
+        return other.chunk.as_ref().unwrap().lines().get(other.line_index).cmp(
+            &self.chunk.as_ref().unwrap().lines().get(self.line_index)
+        )
     }
 }
