@@ -68,18 +68,17 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
     let current_chunks: Vec<ChunkLine> = chunk_iterators
         .iter_mut()
         .enumerate()
-        .map(|(i, ci)| ChunkLine::new(ci.next(), 0, i))
+        .map(|(i, ci)| ChunkLine::new(ci.next().unwrap(), 0, i))
         .collect();
 
     let mut heap: BinaryHeap<ChunkLine> = BinaryHeap::from(current_chunks);
 
     while let Some(smallest) = heap.pop() {
-        smallest.current_line().unwrap().write(file);
+        smallest.current_line().write(file);
 
         let smallest_index = smallest.line_index + 1;
-        if smallest_index >= smallest.chunk.as_ref().unwrap().len() {
-            let new_chunk = chunk_iterators[smallest.iterator_index].next();
-            if new_chunk.is_some() {
+        if smallest_index >= smallest.chunk.len() {
+            if let Some(new_chunk) = chunk_iterators[smallest.iterator_index].next() {
                 heap.push(ChunkLine::new(new_chunk, 0, smallest.iterator_index));
             }
         } else {
