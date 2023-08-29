@@ -62,13 +62,13 @@ impl Chunk {
     }
 
     pub fn write<W: Write>(&self, writer: &mut W) {
-        for line in self.lines() {
+        for line in self.borrow_dependent().lines.iter() {
             line.write(writer);
         }
     }
 
-    pub fn lines(&self) -> &Vec<Line> {
-        self.borrow_dependent().lines.as_ref()
+    pub fn line(&self, index: usize) -> &Line {
+        self.borrow_dependent().lines.get(index).unwrap()
     }
 
     pub fn len(&self) -> usize {

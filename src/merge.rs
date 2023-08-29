@@ -74,7 +74,7 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
     let mut heap: BinaryHeap<ChunkLine> = BinaryHeap::from(current_chunks);
 
     while let Some(smallest) = heap.pop() {
-        smallest.current_line().write(file);
+        smallest.write(file);
 
         let smallest_index = smallest.line_index + 1;
         if smallest_index >= smallest.chunk.len() {

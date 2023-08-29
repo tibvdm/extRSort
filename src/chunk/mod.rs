@@ -2,6 +2,7 @@ mod chunk;
 mod iter;
 
 use std::cmp::Ordering::Less;
+use std::io::Write;
 pub use chunk::Chunk;
 pub use iter::Chunks;
 
@@ -16,12 +17,12 @@ pub struct ChunkLine {
 
 impl ChunkLine {
     pub fn new(chunk: Chunk, line_index: usize, iterator_index: usize) -> Self {
-        let line_len = chunk.lines().get(line_index).unwrap().len();
+        let line_len = chunk.line(line_index).len();
         ChunkLine { chunk, line_len, line_index, iterator_index }
     }
 
-    pub fn current_line(&self) -> &Line {
-        return self.chunk.lines().get(self.line_index).unwrap();
+    pub fn write(&self, writer: &mut impl Write) {
+        self.chunk.line(self.line_index).write(writer);
     }
 }
 
@@ -45,6 +46,6 @@ impl Ord for ChunkLine {
             return Less;
         }
 
-        other.chunk.lines().get(other.line_index).cmp(&self.chunk.lines().get(self.line_index))
+        other.chunk.line(other.line_index).cmp(&self.chunk.line(self.line_index))
     }
 }
