@@ -10,10 +10,6 @@ impl<'a> Line<'a> {
         writer.write_all(self.content.as_bytes()).unwrap();
         writer.write_all(b"\n").unwrap();
     }
-
-    pub fn len(&self) -> usize {
-        self.content.len()
-    }
 }
 
 impl<'a> From<&'a str> for Line<'a> {
