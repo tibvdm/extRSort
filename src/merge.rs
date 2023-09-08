@@ -1,8 +1,8 @@
-use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
+use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap, cell::RefCell, rc::Rc, borrow::Cow};
 
 use threadpool::ThreadPool;
 
-use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, ChunkLine}, Configuration};
+use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, ChunkLine, Chunk}, Configuration};
 
 pub fn merge(
     files: Vec<ClosedTmpFile>, 
@@ -65,25 +65,31 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
         .map(|file| Chunks::new(file, 8_000))
         .collect();
 
-    let current_chunks: Vec<ChunkLine> = chunk_iterators
+    // let current_chunks: RefCell<Vec<Option<Chunk>>> = RefCell::new(chunk_iterators
+    //     .iter_mut()
+    //     .map(|ci| ci.next())
+    //     .collect());
+
+    let mut heap: BinaryHeap<(ChunkLine, Chunk)> = BinaryHeap::from(chunk_iterators
         .iter_mut()
         .enumerate()
-        .map(|(i, ci)| ChunkLine::new(ci.next().unwrap(), 0, i))
-        .collect();
+        .map(|(i, c)| {
+            let mut chunk = c.next().unwrap();
+            let line = Cow::Borrowed(chunk.next_line());
 
-    let mut heap: BinaryHeap<ChunkLine> = BinaryHeap::from(current_chunks);
+            (ChunkLine::new(line, i), chunk)
+        })
+        .collect::<Vec<_>>()
+    );
 
-    while let Some(smallest) = heap.pop() {
+    while let Some((smallest, mut binding)) = heap.pop() {
         smallest.write(file);
 
-        let smallest_index = smallest.line_index + 1;
-        if smallest_index >= smallest.chunk.len() {
-            if let Some(new_chunk) = chunk_iterators[smallest.iterator_index].next() {
-                heap.push(ChunkLine::new(new_chunk, 0, smallest.iterator_index));
-            }
-        } else {
-            heap.push(ChunkLine::new(smallest.chunk, smallest_index, smallest.iterator_index));
+        if binding.is_empty() {
+            binding = chunk_iterators[smallest.iterator_index].next().unwrap();
         }
+
+        heap.push((ChunkLine::new(Cow::Borrowed(binding.next_line()), smallest.iterator_index), binding));
     }
 
     // Remove the temporary files that were merged

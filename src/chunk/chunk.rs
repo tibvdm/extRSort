@@ -23,7 +23,8 @@ self_cell!(
 
 #[derive(Debug)]
 pub struct ChunkData<'a> {
-    pub lines: Vec<Line<'a>>
+    pub lines: Vec<Line<'a>>,
+    pub current_line: usize
 }
 
 impl Chunk {
@@ -52,7 +53,7 @@ impl Chunk {
                 let lines_str = from_utf8(&buffer[..bytes_read]).unwrap();    
                 let lines = line::lines(lines_str).collect();
     
-                ChunkData { lines }
+                ChunkData { lines, current_line: 0 }
             });
     
             return Some(chunk);
@@ -74,6 +75,38 @@ impl Chunk {
     pub fn len(&self) -> usize {
         self.borrow_dependent().lines.len()
     }
+
+    pub fn next_line(&mut self) -> &Line {
+        self.with_dependent_mut(|_, data| {
+            let line = &data.lines[data.current_line];
+            data.current_line += 1;
+            line
+        })
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.borrow_dependent().current_line >= self.len()
+    }
+}
+
+impl PartialEq for Chunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl PartialOrd for Chunk {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }   
+}
+
+impl Eq for Chunk {}
+
+impl Ord for Chunk {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.line(0).cmp(other.line(0))
+    }   
 }
 
 fn fill_buffer<T: Read>(
@@ -129,5 +162,34 @@ fn fill_buffer<T: Read>(
                 panic!("Error while reading input: {}", err);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::from_utf8;
+
+    use crate::line;
+
+    use super::{Chunk, ChunkData};
+
+    fn new_chunk(amount_of_lines: usize) -> Chunk {
+        let buffer = (1..=amount_of_lines).map(|i| format!("line{}\n", i)).collect::<String>().as_bytes().to_vec();
+
+        Chunk::new(buffer, |buffer| {
+            let lines_str = from_utf8(&buffer).unwrap();    
+            let lines = line::lines(lines_str).collect();
+
+            ChunkData { lines, current_line: 0 }
+        })
+    }
+
+    #[test]
+    fn test_chunk_next_line() {
+        let mut chunk = new_chunk(3);
+
+        assert_eq!(chunk.next_line().content, "line1");
+        assert_eq!(chunk.next_line().content, "line2");
+        assert_eq!(chunk.next_line().content, "line3");
     }
 }

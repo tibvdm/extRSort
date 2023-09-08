@@ -2,6 +2,7 @@ use std::io::Read;
 
 use super::chunk::Chunk;
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Chunks<R: Read> {
     input: R,
     carry_over: Vec<u8>,

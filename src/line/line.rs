@@ -1,6 +1,6 @@
 use std::io::Write;
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Debug)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Debug, Clone)]
 pub struct Line<'a> {
     pub content: &'a str
 }
