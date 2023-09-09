@@ -3,4 +3,4 @@ mod line;
 
 pub use line::Line;
 
-pub use iter::lines;
+// pub use iter::lines;

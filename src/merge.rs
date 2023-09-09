@@ -1,8 +1,8 @@
-use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap, cell::RefCell, rc::Rc, borrow::Cow};
+use std::{sync::mpsc::sync_channel, io::{Write, stderr}, collections::BinaryHeap, cell::RefCell, rc::Rc, borrow::Cow};
 
 use threadpool::ThreadPool;
 
-use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, ChunkLine, Chunk}, Configuration};
+use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, Chunk}, Configuration, line::Line};
 
 pub fn merge(
     files: Vec<ClosedTmpFile>, 
@@ -54,42 +54,38 @@ pub fn merge(
     return tmp_files;
 }
 
+// struct MergeItem {
+    
+// }
+
 pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
     let mut opened_files: Vec<TmpFileReader> = files
         .into_iter()
         .map(|file| file.reopen())
         .collect();
 
-    let mut chunk_iterators: Vec<Chunks<&mut TmpFileReader>> = opened_files
+    let chunk_iterators: Vec<Chunks<&mut TmpFileReader>> = opened_files
         .iter_mut()
         .map(|file| Chunks::new(file, 8_000))
         .collect();
 
-    // let current_chunks: RefCell<Vec<Option<Chunk>>> = RefCell::new(chunk_iterators
-    //     .iter_mut()
-    //     .map(|ci| ci.next())
-    //     .collect());
+    let items: Vec<(Chunk, Chunks<&mut TmpFileReader>)> = chunk_iterators
+        .into_iter()
+        .map(|mut ci| (ci.next().unwrap(), ci))
+        .collect::<Vec<_>>();
 
-    let mut heap: BinaryHeap<(ChunkLine, Chunk)> = BinaryHeap::from(chunk_iterators
-        .iter_mut()
-        .enumerate()
-        .map(|(i, c)| {
-            let mut chunk = c.next().unwrap();
-            let line = Cow::Borrowed(chunk.next_line());
+    let mut heap: BinaryHeap<(Chunk, Chunks<&mut TmpFileReader>)> = BinaryHeap::from(items);
 
-            (ChunkLine::new(line, i), chunk)
-        })
-        .collect::<Vec<_>>()
-    );
+    while let Some((mut chunk, mut chunk_iterator)) = heap.pop() {
+        chunk.next_line().write(file);
 
-    while let Some((smallest, mut binding)) = heap.pop() {
-        smallest.write(file);
-
-        if binding.is_empty() {
-            binding = chunk_iterators[smallest.iterator_index].next().unwrap();
+        if chunk.is_empty() {
+            if let Some(new_chunk) = chunk_iterator.next() {
+                heap.push((new_chunk, chunk_iterator))
+            }
+        } else {
+            heap.push((chunk, chunk_iterator));
         }
-
-        heap.push((ChunkLine::new(Cow::Borrowed(binding.next_line()), smallest.iterator_index), binding));
     }
 
     // Remove the temporary files that were merged

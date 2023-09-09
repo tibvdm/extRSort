@@ -1,4 +1,4 @@
-use bytesize::KB;
+use bytesize::MB;
 
 pub struct Configuration {
     pub threads: usize,
@@ -9,7 +9,7 @@ impl Default for Configuration {
     fn default() -> Self {
         Configuration {
             threads: 4,
-            buffer_size: 8 * KB as usize
+            buffer_size: 400 * MB as usize
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{io::{Write, BufWriter, Read, BufReader}, fs::{File, remove_file}, path::PathBuf};
+use std::{io::{Write, BufWriter, Read, BufReader}, fs::{File, remove_file}, path::PathBuf, fmt::Debug};
 
 pub trait TmpFileOpened {
     type Closed: TmpFileClosed;
@@ -99,5 +99,32 @@ impl From<ClosedTmpFile> for TmpFileReader {
 impl Read for TmpFileReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.file.read(buf)
+    }
+}
+
+impl Debug for TmpFileReader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TmpFileReader")
+            .finish()
+    }
+}
+
+impl PartialEq for TmpFileReader {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl PartialOrd for TmpFileReader {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }   
+}
+
+impl Eq for TmpFileReader {}
+
+impl Ord for TmpFileReader {
+    fn cmp(&self, _other: &Self) -> std::cmp::Ordering {
+        std::cmp::Ordering::Equal
     }
 }

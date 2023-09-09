@@ -52,9 +52,6 @@ pub fn sort(
 }
 
 pub fn sort_and_write(mut chunk: Chunk, file: &mut impl Write) {
-    chunk.with_dependent_mut(|_, data| {
-        data.lines.sort_unstable();
-    });
-
+    chunk.sort_unstable();
     chunk.write(file);
 }

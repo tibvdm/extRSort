@@ -1,30 +1,12 @@
-use std::{io::{Read, Write}, str::from_utf8};
+use std::{io::{Read, Write, stderr}, rc::Rc, fmt::Debug};
 
-use memchr::memrchr_iter;
-use self_cell::self_cell;
+use memchr::{memrchr_iter, memchr_iter};
 
-use crate::line::{self, Line};
+use crate::line::Line;
 
-// We need a self referencing cell because a Line is just a reference
-// to a &str, which in turn is a reference to the owner/buffer.
-self_cell!(
-    /// The chunk that is passed around between threads.
-    pub struct Chunk {
-        // {owner} is the buffer that holds all read data
-        owner: Vec<u8>,
-
-        // All processed data/slices from the owner
-        #[covariant]
-        dependent: ChunkData,
-    }
-
-    impl { Debug }
-);
-
-#[derive(Debug)]
-pub struct ChunkData<'a> {
-    pub lines: Vec<Line<'a>>,
-    pub current_line: usize
+pub struct Chunk {
+    lines: Vec<Line>,
+    current_line: usize
 }
 
 impl Chunk {
@@ -46,46 +28,59 @@ impl Chunk {
         if !completed {
             carry_over.extend_from_slice(&buffer[bytes_read..]);
         }
+
+        let buffer = Rc::new(buffer);
     
         // If we read some new bytes
         if bytes_read != 0 {
-            let chunk = Chunk::new(buffer, |buffer| {
-                let lines_str = from_utf8(&buffer[..bytes_read]).unwrap();    
-                let lines = line::lines(lines_str).collect();
-    
-                ChunkData { lines, current_line: 0 }
-            });
-    
-            return Some(chunk);
+            let mut start_index = 0;
+            let mut lines = Vec::with_capacity(bytes_read);
+            for end_index in memchr_iter(b'\n', &buffer[..bytes_read]) {
+                // End index includes the newline
+                lines.push(Line::new(Rc::clone(&buffer), start_index, end_index - 1));
+                start_index = end_index + 1;
+            }
+
+            return Some(Chunk { lines, current_line: 0 });
         }
     
         None
     }
 
     pub fn write<W: Write>(&self, writer: &mut W) {
-        for line in self.borrow_dependent().lines.iter() {
+        for line in &self.lines {
             line.write(writer);
         }
     }
 
-    pub fn line(&self, index: usize) -> &Line {
-        self.borrow_dependent().lines.get(index).unwrap()
-    }
-
     pub fn len(&self) -> usize {
-        self.borrow_dependent().lines.len()
+        self.lines.len()
     }
 
     pub fn next_line(&mut self) -> &Line {
-        self.with_dependent_mut(|_, data| {
-            let line = &data.lines[data.current_line];
-            data.current_line += 1;
-            line
-        })
+        let line = &self.lines[self.current_line];
+        self.current_line += 1;
+        line
     }
 
     pub fn is_empty(&self) -> bool {
-        self.borrow_dependent().current_line >= self.len()
+        self.current_line >= self.len()
+    }
+
+    pub fn sort_unstable(&mut self) {
+        self.lines.sort_unstable();
+    }
+}
+
+impl Debug for Chunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Chunk")
+            .field("line1: ", &self.lines[0])
+            .field("line2: ", &self.lines[1])
+            // .field("line3: ", &self.lines[2])
+            // .field("line4: ", &self.lines[3])
+            // .field("line5: ", &self.lines[4])
+            .finish()
     }
 }
 
@@ -105,7 +100,7 @@ impl Eq for Chunk {}
 
 impl Ord for Chunk {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.line(0).cmp(other.line(0))
+        other.lines[other.current_line].cmp(&self.lines[self.current_line])
     }   
 }
 
@@ -167,29 +162,148 @@ fn fill_buffer<T: Read>(
 
 #[cfg(test)]
 mod tests {
-    use std::str::from_utf8;
+    use std::{rc::Rc, io::{stderr, Write}};
 
-    use crate::line;
+    use crate::{line::Line, chunk::Chunk};
 
-    use super::{Chunk, ChunkData};
+    const BUFFER_STRING: &str = "AAAALTER\nAAA\nAAAA\nAAAALTER\nAAAALTERRR\nCAAAALTER\n";
 
-    fn new_chunk(amount_of_lines: usize) -> Chunk {
-        let buffer = (1..=amount_of_lines).map(|i| format!("line{}\n", i)).collect::<String>().as_bytes().to_vec();
+    fn new_chunk() -> Chunk {
+        let buffer = Rc::new(BUFFER_STRING.as_bytes().to_vec());
 
-        Chunk::new(buffer, |buffer| {
-            let lines_str = from_utf8(&buffer).unwrap();    
-            let lines = line::lines(lines_str).collect();
+        let line1 = Line::new(Rc::clone(&buffer), 0, 7);
+        let line2 = Line::new(Rc::clone(&buffer), 9, 11);
+        let line3 = Line::new(Rc::clone(&buffer), 13, 16);
+        let line4 = Line::new(Rc::clone(&buffer), 18, 25);
+        let line5 = Line::new(Rc::clone(&buffer), 27, 36);
+        let line6 = Line::new(Rc::clone(&buffer), 38, 46);
 
-            ChunkData { lines, current_line: 0 }
-        })
+        Chunk { lines: vec![ line1, line2, line3, line4, line5, line6 ], current_line: 0 }
+    }
+
+    #[test]
+    fn test_chunk_read_sufficient_buffer() {
+        // TODO: add a test where a line is too big to fit in the buffer
+        let mut carry_over = vec![];
+        let mut input = BUFFER_STRING.as_bytes();
+
+        let chunk = Chunk::read(&mut input, &mut carry_over, 32).unwrap();
+        assert_eq!(chunk.lines.len(), 4);
+        assert_eq!(chunk.lines[0].as_bytes(), "AAAALTER".as_bytes());
+        assert_eq!(chunk.lines[1].as_bytes(), "AAA".as_bytes());
+        assert_eq!(chunk.lines[2].as_bytes(), "AAAA".as_bytes());
+        assert_eq!(chunk.lines[3].as_bytes(), "AAAALTER".as_bytes());
+
+        let chunk = Chunk::read(&mut input, &mut carry_over, 32).unwrap();
+        assert_eq!(chunk.lines.len(), 2);
+        assert_eq!(chunk.lines[0].as_bytes(), "AAAALTERRR".as_bytes());
+        assert_eq!(chunk.lines[1].as_bytes(), "CAAAALTER".as_bytes());
+
+        assert!(carry_over.is_empty());
+    }
+
+    #[test]
+    fn test_chunk_read_insufficient_buffer() {
+        unimplemented!()
+    }
+
+    #[test]
+    fn test_chunk_len() {
+        let chunk = new_chunk();
+        assert_eq!(chunk.len(), 6);
     }
 
     #[test]
     fn test_chunk_next_line() {
-        let mut chunk = new_chunk(3);
+        let mut chunk = new_chunk();
 
-        assert_eq!(chunk.next_line().content, "line1");
-        assert_eq!(chunk.next_line().content, "line2");
-        assert_eq!(chunk.next_line().content, "line3");
+        assert_eq!(chunk.next_line().as_bytes(), "AAAALTER".as_bytes());
+        assert_eq!(chunk.next_line().as_bytes(), "AAA".as_bytes());
+        assert_eq!(chunk.next_line().as_bytes(), "AAAA".as_bytes());
+        assert_eq!(chunk.next_line().as_bytes(), "AAAALTER".as_bytes());
+        assert_eq!(chunk.next_line().as_bytes(), "AAAALTERRR".as_bytes());
+        assert_eq!(chunk.next_line().as_bytes(), "CAAAALTER".as_bytes());
+    }
+
+    #[test]
+    fn test_chunk_is_empty() {
+        let non_empty_chunk = new_chunk();
+        assert_eq!(non_empty_chunk.is_empty(), false);
+
+        let empty_chunk = Chunk { lines: vec![], current_line: 0 };
+        assert_eq!(empty_chunk.is_empty(), true);
+    }
+
+    #[test]
+    fn test_chunk_sort_unstable() {
+        let mut chunk = new_chunk();
+
+        chunk.sort_unstable();
+
+        assert_eq!(chunk.lines[0].as_bytes(), "AAA".as_bytes());
+        assert_eq!(chunk.lines[1].as_bytes(), "AAAA".as_bytes());
+        assert_eq!(chunk.lines[2].as_bytes(), "AAAALTER".as_bytes());
+        assert_eq!(chunk.lines[3].as_bytes(), "AAAALTER".as_bytes());
+        assert_eq!(chunk.lines[4].as_bytes(), "AAAALTERRR".as_bytes());
+        assert_eq!(chunk.lines[5].as_bytes(), "CAAAALTER".as_bytes());
+    }
+
+    #[test]
+    fn test_chunk_cmp() {
+        let buffer = Rc::new(BUFFER_STRING.as_bytes().to_vec());
+
+        let line1 = Line::new(Rc::clone(&buffer), 0, 8);
+        let line2 = Line::new(Rc::clone(&buffer), 9, 12);
+        let line3 = Line::new(Rc::clone(&buffer), 13, 17);
+        let line4 = Line::new(Rc::clone(&buffer), 18, 26);
+        let line5 = Line::new(Rc::clone(&buffer), 27, 37);
+        let line6 = Line::new(Rc::clone(&buffer), 38, 47);
+
+        let mut chunk1 = Chunk { lines: vec![ line1, line2, line3 ], current_line: 0 };
+        let mut chunk2 = Chunk { lines: vec![ line4, line5, line6 ], current_line: 0 };
+
+        assert_eq!(chunk1.cmp(&chunk2), std::cmp::Ordering::Equal);
+        assert_eq!(chunk2.cmp(&chunk1), std::cmp::Ordering::Equal);
+
+        chunk1.next_line();
+
+        assert_eq!(chunk1.cmp(&chunk2), std::cmp::Ordering::Less);
+        assert_eq!(chunk2.cmp(&chunk1), std::cmp::Ordering::Greater);
+
+        chunk1.next_line();
+        chunk2.next_line();
+        chunk2.next_line();
+
+        assert_eq!(chunk1.cmp(&chunk2), std::cmp::Ordering::Less);
+        assert_eq!(chunk2.cmp(&chunk1), std::cmp::Ordering::Greater);
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use std::str::from_utf8;
+
+//     use crate::line;
+
+//     use super::{Chunk, ChunkData};
+
+//     fn new_chunk(amount_of_lines: usize) -> Chunk {
+//         let buffer = (1..=amount_of_lines).map(|i| format!("line{}\n", i)).collect::<String>().as_bytes().to_vec();
+
+//         Chunk::new(buffer, |buffer| {
+//             let lines_str = from_utf8(&buffer).unwrap();    
+//             let lines = line::lines(lines_str).collect();
+
+//             ChunkData { lines, current_line: 0 }
+//         })
+//     }
+
+//     #[test]
+//     fn test_chunk_next_line() {
+//         let mut chunk = new_chunk(3);
+
+//         assert_eq!(chunk.next_line().content, "line1");
+//         assert_eq!(chunk.next_line().content, "line2");
+//         assert_eq!(chunk.next_line().content, "line3");
+//     }
+// }
