@@ -1,5 +1,4 @@
 use std::{io::{self, BufReader, BufWriter}, path::PathBuf};
-use std::fs::File;
 
 use sorter::{TmpDirBuilder, external_sort, Configuration};
 use structopt::StructOpt;
@@ -10,10 +9,8 @@ fn main() {
     let stdin = io::stdin();
     let stdout = io::stdout();
 
-    let stdout = File::create("/tmp/sort-out").unwrap();
-
     let mut input_reader = BufReader::with_capacity(40_000_000, stdin.lock());
-    let mut output_writer = BufWriter::new(stdout);
+    let mut output_writer = BufWriter::new(stdout.lock());
 
     let tmp_location = PathBuf::from("/tmp");
     let mut tmp_dir = TmpDirBuilder::new().with_location(&tmp_location).build();

@@ -1,4 +1,4 @@
-use std::{io::{Read, Write, stderr}, rc::Rc, fmt::Debug};
+use std::{io::{Read, Write}, rc::Rc, fmt::Debug};
 
 use memchr::{memrchr_iter, memchr_iter};
 
@@ -162,7 +162,7 @@ fn fill_buffer<T: Read>(
 
 #[cfg(test)]
 mod tests {
-    use std::{rc::Rc, io::{stderr, Write}};
+    use std::rc::Rc;
 
     use crate::{line::Line, chunk::Chunk};
 

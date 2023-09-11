@@ -1,8 +1,8 @@
-use std::{sync::mpsc::sync_channel, io::{Write, stderr}, collections::BinaryHeap, cell::RefCell, rc::Rc, borrow::Cow};
+use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
 
 use threadpool::ThreadPool;
 
-use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, Chunk}, Configuration, line::Line};
+use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, Chunk}, Configuration};
 
 pub fn merge(
     files: Vec<ClosedTmpFile>, 

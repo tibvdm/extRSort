@@ -52,8 +52,6 @@ impl Ord for Line {
 
 #[cfg(test)]
 mod tests {
-    use crate::line;
-
     use super::*;
 
     #[test]
