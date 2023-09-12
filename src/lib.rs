@@ -33,6 +33,9 @@ pub fn external_sort(
     // Stage 2: Merge all temporary files into multiple bigger temporary files
     let stage2_tmp_files = merge::merge(stage1_tmp_files, &threadpool, tmp_dir, &config);
 
+    // Stage 3: Merge all temporary files into multiple bigger temporary files
+    let stage3_tmp_files = merge::merge(stage2_tmp_files, &threadpool, tmp_dir, &config);
+
     // Stage 3: Merge all temporary files into the output stream
-    merge::merge_and_write(stage2_tmp_files, output);
+    merge::merge_and_write(stage3_tmp_files, output);
 }

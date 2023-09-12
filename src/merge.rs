@@ -90,6 +90,6 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
 
     // Remove the temporary files that were merged
     for file in opened_files {
-        file.close_and_remove();
+       file.close_and_remove();
     }
 }

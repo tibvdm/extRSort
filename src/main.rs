@@ -9,7 +9,7 @@ fn main() {
     let stdin = io::stdin();
     let stdout = io::stdout();
 
-    let mut input_reader = BufReader::with_capacity(40_000_000, stdin.lock());
+    let mut input_reader = BufReader::new(stdin.lock());
     let mut output_writer = BufWriter::new(stdout.lock());
 
     let tmp_location = PathBuf::from("/tmp");
