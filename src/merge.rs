@@ -1,5 +1,5 @@
 use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
-use std::cmp::min;
+use std::cmp::{min, max};
 
 use threadpool::ThreadPool;
 
@@ -18,7 +18,9 @@ pub fn merge(
     let chunk_size = if files.len() < config.chunk_size {
         config.chunk_size
     } else {
-        min(config.chunk_size, files.len() / config.threads)
+        // Small heuristic to avoid only having a single thread doing the merging
+        // when the work can be divided into more chunks
+        min(config.chunk_size, max(2, files.len() / config.threads))
     };
 
     let mut file_batches = into_chunks(files, chunk_size).into_iter();
