@@ -14,7 +14,7 @@ pub fn merge(
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
 
-    let mut file_batches = into_chunks(files, 20).into_iter();
+    let mut file_batches = into_chunks(files, 6).into_iter();
 
     for _ in 0..config.threads {
         if let Some(file_batch) = file_batches.next() {

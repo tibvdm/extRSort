@@ -1,4 +1,4 @@
-from tqdm import tqdm
+# from tqdm import tqdm
 
 import random
 import argparse
@@ -33,5 +33,5 @@ if __name__ == '__main__':
             for _ in range(amount_of_batches)
         ]
         
-        for future in tqdm(concurrent.futures.as_completed(futures), total = len(futures)):
+        for future in concurrent.futures.as_completed(futures):
             print('\n'.join(future.result()))

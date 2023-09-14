@@ -12,7 +12,7 @@ fn main() {
     let mut input_reader = BufReader::new(stdin.lock());
     let mut output_writer = BufWriter::new(stdout.lock());
 
-    let tmp_location = PathBuf::from("/tmp");
+    let tmp_location = PathBuf::from("/mnt/data/tmp");
     let mut tmp_dir = TmpDirBuilder::new().with_location(&tmp_location).build();
 
     let config = Configuration {
