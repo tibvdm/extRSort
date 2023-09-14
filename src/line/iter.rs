@@ -30,9 +30,9 @@ impl<R: Read> Iterator for Lines<R> {
 
         if let Some(next_chunk) = self.chunks.next() {
             self.chunk = Some(next_chunk);
-            self.next()
-        } else {
-            return None
-        }
+            return self.next();
+        } 
+
+        None
     }
 }

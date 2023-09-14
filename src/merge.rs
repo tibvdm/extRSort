@@ -1,4 +1,5 @@
 use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
+use std::cmp::min;
 
 use threadpool::ThreadPool;
 
@@ -14,7 +15,13 @@ pub fn merge(
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
 
-    let mut file_batches = into_chunks(files, config.chunk_size).into_iter();
+    let chunk_size = if files.len() < config.chunk_size {
+        config.chunk_size
+    } else {
+        min(config.chunk_size, files.len() / config.threads)
+    };
+
+    let mut file_batches = into_chunks(files, chunk_size).into_iter();
 
     for _ in 0..config.threads {
         if let Some(file_batch) = file_batches.next() {
@@ -53,10 +60,6 @@ pub fn merge(
 
     return tmp_files;
 }
-
-// struct MergeItem {
-    
-// }
 
 pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
     let mut opened_files: Vec<TmpFileReader> = files

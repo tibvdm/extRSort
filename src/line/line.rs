@@ -1,6 +1,6 @@
-use std::{rc::Rc, io::Write, str::from_utf8, fmt::Debug};
+use std::{rc::Rc, io::Write};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Line {
     pub buffer: Rc<Vec<u8>>,
 
@@ -25,25 +25,11 @@ impl Line {
 
 unsafe impl Send for Line {}
 
-impl Debug for Line {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", from_utf8(self.as_bytes()).unwrap())
-    }
-}
-
-impl PartialEq for Line {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == std::cmp::Ordering::Equal
-    }
-}
-
 impl PartialOrd for Line {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+        other.as_bytes().partial_cmp(self.as_bytes())
     }   
 }
-
-impl Eq for Line {}
 
 impl Ord for Line {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
