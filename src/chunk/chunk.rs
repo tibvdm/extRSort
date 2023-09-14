@@ -1,4 +1,4 @@
-use std::{io::{Read, Write}, rc::Rc, fmt::Debug};
+use std::{io::{Read, Write}, rc::Rc};
 
 use memchr::{memrchr_iter, memchr_iter};
 
@@ -69,38 +69,6 @@ impl Iterator for Chunk {
 
         None
     }
-}
-
-impl Debug for Chunk {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Chunk")
-            .field("line1: ", &self.lines[0])
-            .field("line2: ", &self.lines[1])
-            // .field("line3: ", &self.lines[2])
-            // .field("line4: ", &self.lines[3])
-            // .field("line5: ", &self.lines[4])
-            .finish()
-    }
-}
-
-impl PartialEq for Chunk {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == std::cmp::Ordering::Equal
-    }
-}
-
-impl PartialOrd for Chunk {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }   
-}
-
-impl Eq for Chunk {}
-
-impl Ord for Chunk {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.lines[other.current_line].cmp(&self.lines[self.current_line])
-    }   
 }
 
 fn fill_buffer<T: Read>(

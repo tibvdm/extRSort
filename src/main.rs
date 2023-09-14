@@ -1,4 +1,5 @@
 use std::{io::{self, BufReader, BufWriter}, path::PathBuf};
+use std::fs::File;
 
 use sorter::{TmpDirBuilder, external_sort, Configuration};
 use structopt::StructOpt;
