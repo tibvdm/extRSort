@@ -9,6 +9,8 @@ fn main() {
     let stdin = io::stdin();
     let stdout = io::stdout();
 
+    //let stdout = File::create("/dev/null").unwrap();
+
     let mut input_reader = BufReader::new(stdin.lock());
     let mut output_writer = BufWriter::new(stdout.lock());
 
@@ -17,7 +19,8 @@ fn main() {
 
     let config = Configuration {
         buffer_size: args.buffer_size,
-        threads: args.threads
+        threads: args.threads,
+        ..Configuration::default()
     };
 
     external_sort(

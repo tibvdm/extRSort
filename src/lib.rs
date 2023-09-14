@@ -27,15 +27,14 @@ pub fn external_sort(
     // Create a chunk iterator over the input stream
     let mut input_chunks = Chunks::new(input, config.buffer_size);
 
-    // Stage 1: Sort all chunks and write them to small temporary files
-    let stage1_tmp_files = sort::sort(&mut input_chunks, &threadpool, tmp_dir, &config);
+    // Sort all chunks and write them to small temporary files
+    let mut sorted_files = sort::sort(&mut input_chunks, &threadpool, tmp_dir, &config);
 
-    // Stage 2: Merge all temporary files into multiple bigger temporary files
-    let stage2_tmp_files = merge::merge(stage1_tmp_files, &threadpool, tmp_dir, &config);
+    // Keep merging until the amount of files is small enough
+    while sorted_files.len() > config.chunk_size {
+        sorted_files = merge::merge(sorted_files, &threadpool, tmp_dir, &config);
+    }
 
-    // Stage 3: Merge all temporary files into multiple bigger temporary files
-    let stage3_tmp_files = merge::merge(stage2_tmp_files, &threadpool, tmp_dir, &config);
-
-    // Stage 3: Merge all temporary files into the output stream
-    merge::merge_and_write(stage3_tmp_files, output);
+    // Merge all temporary files into the output stream
+    merge::merge_and_write(sorted_files, output);
 }
