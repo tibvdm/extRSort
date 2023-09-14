@@ -1,5 +1,6 @@
 use std::{rc::Rc, io::Write, str::from_utf8, fmt::Debug};
 
+#[derive(Clone)]
 pub struct Line {
     pub buffer: Rc<Vec<u8>>,
 
@@ -46,7 +47,7 @@ impl Eq for Line {}
 
 impl Ord for Line {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.as_bytes().cmp(other.as_bytes())
+        other.as_bytes().cmp(self.as_bytes())
     }
 }
 

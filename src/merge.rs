@@ -2,7 +2,7 @@ use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
 
 use threadpool::ThreadPool;
 
-use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, chunk::{Chunks, Chunk}, Configuration};
+use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, Configuration, line::{Lines, Line}};
 
 pub fn merge(
     files: Vec<ClosedTmpFile>, 
@@ -14,7 +14,7 @@ pub fn merge(
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
 
-    let mut file_batches = into_chunks(files, 6).into_iter();
+    let mut file_batches = into_chunks(files, config.chunk_size).into_iter();
 
     for _ in 0..config.threads {
         if let Some(file_batch) = file_batches.next() {
@@ -64,27 +64,24 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
         .map(|file| file.reopen())
         .collect();
 
-    let chunk_iterators: Vec<Chunks<&mut TmpFileReader>> = opened_files
+    let mut lines_iterators: Vec<Lines<&mut TmpFileReader>> = opened_files
         .iter_mut()
-        .map(|file| Chunks::new(file, 8_000))
+        .map(|file| Lines::new(file, 8_000))
         .collect();
 
-    let items: Vec<(Chunk, Chunks<&mut TmpFileReader>)> = chunk_iterators
-        .into_iter()
-        .map(|mut ci| (ci.next().unwrap(), ci))
-        .collect::<Vec<_>>();
+    let mut heap: BinaryHeap<(Line, usize)> = BinaryHeap::from(
+        lines_iterators
+            .iter_mut()
+            .enumerate()
+            .map(|(i, lines)| (lines.next().unwrap(), i))
+            .collect::<Vec<(Line, usize)>>()
+    );
 
-    let mut heap: BinaryHeap<(Chunk, Chunks<&mut TmpFileReader>)> = BinaryHeap::from(items);
+    while let Some((line, lines_index)) = heap.pop() {
+        line.write(file);
 
-    while let Some((mut chunk, mut chunk_iterator)) = heap.pop() {
-        chunk.next_line().write(file);
-
-        if chunk.is_empty() {
-            if let Some(new_chunk) = chunk_iterator.next() {
-                heap.push((new_chunk, chunk_iterator))
-            }
-        } else {
-            heap.push((chunk, chunk_iterator));
+        if let Some(new_line) = lines_iterators[lines_index].next() {
+            heap.push((new_line, lines_index));
         }
     }
 
