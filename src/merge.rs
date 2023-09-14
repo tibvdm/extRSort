@@ -15,12 +15,12 @@ pub fn merge(
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
 
-    let chunk_size = if files.len() < config.chunk_size {
-        config.chunk_size
-    } else {
-        // Small heuristic to avoid only having a single thread doing the merging
-        // when the work can be divided into more chunks
+    // If the amount of files is smaller than chunk_size * threads, then we can 
+    // use a smaller chunk size to better distribute the merging work
+    let chunk_size = if files.len() < config.chunk_size * config.threads {
         min(config.chunk_size, max(2, files.len() / config.threads))
+    } else {
+        config.chunk_size
     };
 
     let mut file_batches = into_chunks(files, chunk_size).into_iter();
