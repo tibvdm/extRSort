@@ -25,7 +25,7 @@ pub fn external_sort(
     let threadpool = ThreadPool::new(config.threads);
 
     // Create a chunk iterator over the input stream
-    let mut input_chunks = Chunks::new(input, config.buffer_size);
+    let mut input_chunks = Chunks::new(input, config.buffer_size / config.threads);
 
     // Sort all chunks and write them to small temporary files
     let mut sorted_files = sort::sort(&mut input_chunks, &threadpool, tmp_dir, &config);
@@ -36,5 +36,5 @@ pub fn external_sort(
     }
 
     // Merge all temporary files into the output stream
-    merge::merge_and_write(sorted_files, output);
+    merge::merge_and_write(sorted_files, output, config);
 }

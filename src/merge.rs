@@ -1,6 +1,7 @@
 use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
 use std::cmp::{min, max};
 
+use bytesize::MB;
 use threadpool::ThreadPool;
 
 use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, Configuration, line::{Lines, Line}};
@@ -29,9 +30,10 @@ pub fn merge(
         if let Some(file_batch) = file_batches.next() {
             let sender = file_sender.clone();
             let mut tmp_file = tmp_dir.create_new_file();
+            let config = config.clone();
 
             sorter_pool.execute(move || {
-                merge_and_write(file_batch, &mut tmp_file);
+                merge_and_write(file_batch, &mut tmp_file, config);
                 let _ = sender.send(tmp_file.close());
             });
         }
@@ -49,9 +51,10 @@ pub fn merge(
                 Some(file_batch) => {
                     let sender = sender.clone();
                     let mut tmp_file = tmp_dir.create_new_file();
+                    let config = config.clone();
 
                     sorter_pool.execute(move || {
-                        merge_and_write(file_batch, &mut tmp_file);
+                        merge_and_write(file_batch, &mut tmp_file, config);
                         let _ = sender.send(tmp_file.close());
                     });
                 },
@@ -63,7 +66,9 @@ pub fn merge(
     return tmp_files;
 }
 
-pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
+pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config: Configuration) {
+    let buffer_size = min(40 * MB as usize, config.buffer_size / files.len());
+
     let mut opened_files: Vec<TmpFileReader> = files
         .into_iter()
         .map(|file| file.reopen())
@@ -71,7 +76,7 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write) {
 
     let mut lines_iterators: Vec<Lines<&mut TmpFileReader>> = opened_files
         .iter_mut()
-        .map(|file| Lines::new(file, 8_000))
+        .map(|file| Lines::new(file, buffer_size))
         .collect();
 
     let mut heap: BinaryHeap<(Line, usize)> = BinaryHeap::from(
