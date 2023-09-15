@@ -15,6 +15,9 @@ THREADS_SMALL="1 2 4 8"
 BUFFER_SIZE_MEDIUM="$((200 * $MB))"
 THREADS_MEDIUM="1 2 4 8"
 
+BUFFER_SIZE_LARGE="$((500 * $MB)) $((1 * $GB)) $((2 * $GB)) $((4 * $GB))"
+THREADS_LARGE="4 8"
+
 log() {
     echo -en "$1" 1>&2
 }
@@ -32,14 +35,26 @@ build_extrsort() {
 # =============================
 
 generate_small_data_file() {
-    python3 create_data_file.py --min-length 5 --max-length 150 --amount 2500000 --batch-size 10000 > "$1"
+    if [[ -f "$1" ]]; then
+        logn "File already exists"
+    else
+	    python3 create_data_file.py --min-length 5 --max-length 150 --amount 2500000 --batch-size 10000 > "$1"
+    fi
 }
 
 generate_medium_data_file() {
     if [[ -f "$1" ]]; then
         logn "File already exists"
     else
-	python3 create_data_file.py --min-length 5 --max-length 150 --amount 50000000 --batch-size 100000 > "$1"
+	    python3 create_data_file.py --min-length 5 --max-length 150 --amount 50000000 --batch-size 100000 > "$1"
+    fi
+}
+
+generate_large_data_file() {
+    if [[ -f "$1" ]]; then
+        logn "File already exists"
+    else
+	    python3 create_data_file.py --min-length 5 --max-length 150 --amount 1000000000 --batch-size 2000000 > "$1"
     fi
 }
 
@@ -114,8 +129,9 @@ bench_gnu_sort_c() {
     for threads in $3; do
 	thread_string=$(format_threads $threads)
         for buffer_size in $4; do
+            buffer_size_string=$(format_buffer_size $buffer_size)
             for iteration in $(seq 1 $2); do
-                log "\r\033[K\033[36m[ $current_configuration / 32 ]\033[m Benchmarking with $thread_string and buffer size $buffer_size ($iteration / $2)"
+                log "\r\033[K\033[36m[ $current_configuration / 32 ]\033[m Benchmarking with $thread_string and buffer size $buffer_size_string ($iteration / $2)"
                 time_gnu_sort_c $1 $threads $buffer_size
             done
 
@@ -133,7 +149,7 @@ bench_small() {
 
     logn "\033[32mBenchmarking extrsort\033[0m"
     echo "threads,buffer_size,real,user,sys" > "data/extrsort.timings.small.csv"
-#    bench_extsort "data/small.unsorted" "$AMOUNT_OF_ITERATIONS" "$THREADS_SMALL" "$BUFFER_SIZE_SMALL" >> "data/extrsort.timings.small.csv"
+    bench_extsort "data/small.unsorted" "$AMOUNT_OF_ITERATIONS" "$THREADS_SMALL" "$BUFFER_SIZE_SMALL" >> "data/extrsort.timings.small.csv"
     logn
 
     logn "\033[32mBenchmarking gnu sort (C)\033[0m"
@@ -164,6 +180,25 @@ bench_medium() {
     logn
 }
 
+bench_large() {
+    logn "Generating large data set"
+    generate_large_data_file "/mnt/data/tmp/large.unsorted"
+    logn
+
+    logn "\033[32mBenchmarking extrsort\033[0m"
+    echo "threads,buffer_size,real,user,sys" > "data/extrsort.timings.large.csv"
+    bench_extsort "/mnt/data/tmp/large.unsorted" "$AMOUNT_OF_ITERATIONS" "$THREADS_LARGE" "$BUFFER_SIZE_LARGE" >> "data/extrsort.timings.large.csv"
+    logn
+
+    logn "\033[32mBenchmarking gnu sort (C)\033[0m"
+    echo "threads,buffer_size,real,user,sys" > "data/gnu_sort_c.timings.large.csv"
+    bench_gnu_sort_c "/mnt/data/tmp/large.unsorted" "$AMOUNT_OF_ITERATIONS" "$THREADS_LARGE" "$BUFFER_SIZE_LARGE" >> "data/gnu_sort_c.timings.large.csv"
+
+    #rm "/mnt/data/tmp/medium.unsorted"
+
+    logn
+}
+
 # ==================
 # ====== Main ======
 # ==================
@@ -172,7 +207,7 @@ bench_medium() {
 build_extrsort
 
 # Run benchmarks
-bench_medium
+bench_large
 
 # i=1000000
 # while [ $i -lt 50000000 ]; do
