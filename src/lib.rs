@@ -36,5 +36,5 @@ pub fn external_sort(
     }
 
     // Merge all temporary files into the output stream
-    merge::merge_and_write(sorted_files, output);
+    merge::merge_and_write(sorted_files, output, config);
 }

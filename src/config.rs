@@ -1,5 +1,6 @@
 use bytesize::MB;
 
+#[derive(Clone)]
 pub struct Configuration {
     pub threads: usize,
     pub buffer_size: usize,
