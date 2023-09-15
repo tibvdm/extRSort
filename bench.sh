@@ -173,3 +173,17 @@ build_extrsort
 
 # Run benchmarks
 bench_medium
+
+# i=1000000
+# while [ $i -lt 50000000 ]; do
+#     timings=$(LC_ALL=C head -n "$i" "/mnt/data/tmp/medium.unsorted" | { time $EXTRSORT_EXECUTABLE --parallel 1 --buffer-size 50000000 > "/dev/null"; } 2>&1)
+#
+#     real=$(echo $timings | cut -d' ' -f2)
+#     user=$(echo $timings | cut -d' ' -f4)
+#     sys=$(echo $timings | cut -d' ' -f6)
+#
+#     echo "$real"
+#     i=$((i + 1000000))
+# done 
+
+
