@@ -1,9 +1,10 @@
-use std::{sync::mpsc::sync_channel, io::Write, collections::BinaryHeap};
+use std::{sync::mpsc::sync_channel, io::Write};
 use std::cmp::{min, max};
 
 use bytesize::MB;
 use threadpool::ThreadPool;
 
+use crate::heap::WinnerHeap;
 use crate::{tempfile::{ClosedTmpFile, TmpDir, TmpFileReader, TmpFileClosed, TmpFileRead, TmpFileOpened}, util::into_chunks, Configuration, line::{Lines, Line}};
 
 pub fn merge(
@@ -79,7 +80,7 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config:
         .map(|file| Lines::new(file, buffer_size))
         .collect();
 
-    let mut heap: BinaryHeap<(Line, usize)> = BinaryHeap::from(
+    let mut heap: WinnerHeap<(Line, usize)> = WinnerHeap::new(
         lines_iterators
             .iter_mut()
             .enumerate()

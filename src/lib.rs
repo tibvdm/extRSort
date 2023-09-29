@@ -11,6 +11,7 @@ mod tempfile;
 mod sort;
 mod merge;
 mod util;
+mod heap;
 
 pub use crate::config::Configuration;
 pub use crate::tempfile::TmpDirBuilder;
