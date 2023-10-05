@@ -15,6 +15,12 @@ def generate_peptide(length):
 def generate_peptides(amount, min_length = 5, max_length = 50):
     return [generate_peptide(random.randint(min_length, max_length)) for _ in range(amount)]
 
+def generate_column_peptides(amount, min_length = 5, max_length = 50):
+    return [
+        f"{generate_peptide(random.randint(min_length, max_length))}\t{generate_peptide(random.randint(min_length, max_length))}"
+        for _ in range(amount)
+    ]
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--min-length', type = int, default = 5)
@@ -29,7 +35,7 @@ if __name__ == '__main__':
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
         futures = [
-            executor.submit(generate_peptides, args.batch_size, args.min_length, args.max_length) 
+            executor.submit(generate_column_peptides, args.batch_size, args.min_length, args.max_length) 
             for _ in range(amount_of_batches)
         ]
         

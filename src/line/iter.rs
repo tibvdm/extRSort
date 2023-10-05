@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use crate::chunk::{Chunks, Chunk};
+use crate::{chunk::{Chunks, Chunk}, Configuration};
 
 use super::Line;
 
@@ -10,8 +10,8 @@ pub struct Lines<R: Read> {
 }
 
 impl<R: Read> Lines<R> {
-    pub fn new(input: R, buffer_size: usize) -> Self {
-        let mut chunks = Chunks::new(input, buffer_size);
+    pub fn new(input: R, buffer_size: usize, config: Configuration) -> Self {
+        let mut chunks = Chunks::new(input, buffer_size, config);
         let chunk = chunks.next();
 
         Lines { chunks, chunk }

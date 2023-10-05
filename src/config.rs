@@ -9,6 +9,12 @@ pub struct Configuration {
     pub field: usize // Maybe multiple fields in the future
 }
 
+impl Configuration {
+    pub fn has_field(&self) -> bool {
+        self.field > 1
+    }
+}
+
 impl Default for Configuration {
     fn default() -> Self {
         Configuration {
@@ -16,7 +22,7 @@ impl Default for Configuration {
             buffer_size: 400 * MB as usize,
             chunk_size: 16,
             delimiter: b'\t',
-            field: 0
+            field: 1
         }
     }
 }

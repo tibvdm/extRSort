@@ -77,7 +77,7 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config:
 
     let mut lines_iterators: Vec<Lines<&mut TmpFileReader>> = opened_files
         .iter_mut()
-        .map(|file| Lines::new(file, buffer_size))
+        .map(|file| Lines::new(file, buffer_size, config.clone()))
         .collect();
 
     let mut heap: WinnerHeap<(Line, usize)> = WinnerHeap::new(

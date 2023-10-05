@@ -1,8 +1,8 @@
-use std::{io::{Read, Write}, rc::Rc};
+use std::{io::{Read, Write, stderr}, rc::Rc};
 
-use memchr::{memrchr_iter, memchr_iter};
+use memchr::{memchr, memrchr_iter, memchr_iter, memchr2_iter};
 
-use crate::line::Line;
+use crate::{line::Line, Configuration};
 
 pub struct Chunk {
     lines: Vec<Line>,
@@ -13,7 +13,8 @@ impl Chunk {
     pub fn read<R: Read>(
         input: &mut R, 
         carry_over: &mut Vec<u8>,
-        buffer_size: usize
+        buffer_size: usize,
+        config: &Configuration
     ) -> Option<Self> {
         let mut buffer = vec![0; buffer_size];
     
@@ -35,9 +36,18 @@ impl Chunk {
         if bytes_read != 0 {
             let mut start_index = 0;
             let mut lines = Vec::with_capacity(bytes_read);
+
             for end_index in memchr_iter(b'\n', &buffer[..bytes_read]) {
+                let mut offset = 0;
+                if config.has_field() {
+                    offset = memchr_iter(config.delimiter, &buffer[start_index..end_index])
+                        .skip(config.field - 2)
+                        .next()
+                        .expect("Fields should be correct");
+                }
+
                 // End index includes the newline
-                lines.push(Line::new(Rc::clone(&buffer), start_index, end_index - 1));
+                lines.push(Line::new_with_offset(Rc::clone(&buffer), start_index, end_index - 1, offset));
                 start_index = end_index + 1;
             }
 
