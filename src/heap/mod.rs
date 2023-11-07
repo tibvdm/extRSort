@@ -110,14 +110,6 @@ impl<T: Ord> WinnerHeap<T> {
         Self { internal, internal_size, leaves, last_pop: None }
     }
 
-    pub fn peek(&self) -> Option<&T> {
-        if let Some(pos) = self.internal[0] {
-            return self.leaves[pos].value.as_ref();
-        }
-
-        None
-    }
-
     pub fn pop(&mut self) -> Option<T> {
         if let Some(pos) = self.last_pop {
             self.update(pos);
@@ -137,22 +129,6 @@ impl<T: Ord> WinnerHeap<T> {
         self.leaves[leaf_position].fill_value(value);
 
         self.update(leaf_position);
-    }
-
-    pub fn pop_push(&mut self, value: T) -> Option<T> {
-        if let Some(leaf_position) = self.internal[0] {
-            if let Some(leaf) = self.leaves[leaf_position].take_value() {
-                if leaf <= value {
-                    self.leaves[leaf_position].fill_value(value);
-                } else {
-                    self.update(leaf_position);
-                }
-    
-                return Some(leaf);
-            }
-        }
-
-        None
     }
 
     fn update(&mut self, position: usize) {
@@ -388,14 +364,5 @@ mod tests {
         winner_tree.push(5);
         assert_eq!(winner_tree.pop(), Some(5));
         assert_eq!(winner_tree.pop(), None);
-    }
-
-    #[test]
-    fn test_pop_push() {
-        let mut winner_tree = WinnerHeap::new(vec![ 4, 7, 2 ]);
-
-        assert_eq!(winner_tree.pop_push(14), Some(7));
-        assert_eq!(winner_tree.pop_push(3), Some(14));
-        assert_eq!(winner_tree.pop_push(4), Some(4));
     }
 }

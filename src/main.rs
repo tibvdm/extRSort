@@ -1,5 +1,5 @@
 use std::{io::{self, BufReader, BufWriter}, path::PathBuf};
-use std::fs::File;
+// use std::fs::File;
 
 use sorter::{TmpDirBuilder, external_sort, Configuration};
 use structopt::StructOpt;
@@ -39,7 +39,7 @@ pub struct SortArgs {
     pub tmp_dir: PathBuf,
 
     /// Buffer size in bytes
-    #[structopt(short = "b", long = "buffer-size", default_value = "300000000")]
+    #[structopt(short = "b", long = "buffer-size", default_value = "800000000")]
     pub buffer_size: usize,
 
     /// Number of threads to use

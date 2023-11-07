@@ -7,20 +7,16 @@ pub struct Line {
     pub start: usize,
     pub end: usize,
 
-    pub sort_start: usize,
+    pub field: (usize, usize),
 }
 
 impl Line {
     pub fn new(buffer: Rc<Vec<u8>>, start: usize, end: usize) -> Self {
-        Line { buffer, start, end, sort_start: start }
+        Line { buffer, start, end, field: (start, end) }
     }
 
-    pub fn new_with_offset(buffer: Rc<Vec<u8>>, start: usize, end: usize, sort_offset: usize) -> Self {
-        Line { buffer, start, end, sort_start: start + sort_offset }
-    }
-
-    pub fn new_with_sort(buffer: Rc<Vec<u8>>, start: usize, end: usize, sort_start: usize) -> Self {
-        Line { buffer, start, end, sort_start }
+    pub fn new_with_field(buffer: Rc<Vec<u8>>, start: usize, end: usize, field: (usize, usize)) -> Self {
+        Line { buffer, start, end, field }
     }
 
     pub fn write(&self, writer: &mut impl Write) {
@@ -33,7 +29,7 @@ impl Line {
     }
 
     pub fn as_sort_bytes(&self) -> &[u8] {
-        &self.buffer[self.sort_start..=self.end]
+        &self.buffer[self.field.0..=self.field.0]
     }
 }
 

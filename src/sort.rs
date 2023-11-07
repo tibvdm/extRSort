@@ -1,4 +1,4 @@
-use std::{io::{Read, Write}, sync::mpsc::sync_channel};
+use std::{io::{Read, Write}, sync::mpsc::channel};
 
 use threadpool::ThreadPool;
 
@@ -10,15 +10,16 @@ pub fn sort(
     tmp_dir: &mut TmpDir,
     config: &Configuration
 ) -> Vec<ClosedTmpFile> {
-    let (file_sender, file_receiver) = sync_channel(1);
+    let (file_sender, file_receiver) = channel();
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
 
-    // Create new chunks
+    // Create new chunks while inside limits
     for _ in 0..config.threads {
         if let Some(unsorted_chunk) = input_chunks.next() {
-            let sender = file_sender.clone();
             let mut tmp_file = tmp_dir.create_new_file();
+            let sender = file_sender.clone();
+
             sorter_pool.execute(move || {
                 sort_and_write(unsorted_chunk, &mut tmp_file);
                 let _ = sender.send(tmp_file.close());
@@ -36,8 +37,9 @@ pub fn sort(
         if let Some(sender) = &option_sender {
             match input_chunks.next() {
                 Some(unsorted_chunk) => {
-                    let sender = sender.clone();
                     let mut tmp_file = tmp_dir.create_new_file();
+                    let sender = sender.clone();
+                    
                     sorter_pool.execute(move || {
                         sort_and_write(unsorted_chunk, &mut tmp_file);
                         let _ = sender.send(tmp_file.close());
