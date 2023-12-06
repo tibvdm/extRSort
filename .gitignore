@@ -3,5 +3,6 @@
 /target
 /data
 /env
+/doc
 
 *.DS_Store

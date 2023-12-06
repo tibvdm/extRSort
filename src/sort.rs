@@ -53,6 +53,7 @@ pub fn sort(
     return tmp_files;
 }
 
+/// Sorts a chunk and writes it to a file
 pub fn sort_and_write(mut chunk: Chunk, file: &mut impl Write) {
     chunk.sort_unstable();
     chunk.write(file);
