@@ -12,8 +12,7 @@ fn main() {
     let mut input_reader = BufReader::new(stdin.lock());
     let mut output_writer = BufWriter::new(stdout.lock());
 
-    let tmp_location = PathBuf::from("/tmp");
-    let mut tmp_dir = TmpDirBuilder::new().with_location(&tmp_location).build();
+    let mut tmp_dir = TmpDirBuilder::new().with_location(&args.tmp_dir).build();
 
     let config = Configuration {
         buffer_size: args.buffer_size,
