@@ -1,6 +1,6 @@
-use std::{io::{Read, Write}, rc::Rc};
+use std::{io::{ErrorKind, Read, Write}, rc::Rc};
 
-use memchr::{memrchr_iter, memchr_iter};
+use memchr::{memchr_iter, memrchr};
 
 use crate::{line::Line, Configuration};
 
@@ -16,7 +16,8 @@ impl Chunk {
         buffer_size: usize,
         config: &Configuration
     ) -> Option<Self> {
-        let mut buffer = vec![0; buffer_size];
+        // At least as large as the carry over, which is longer than buffer_size after a long line
+        let mut buffer = vec![0; buffer_size.max(carry_over.len())];
     
         // Put the carry over bytes at the beginning of the buffer
         buffer[..carry_over.len()].copy_from_slice(carry_over);
@@ -98,49 +99,32 @@ fn fill_buffer<T: Read>(
     buffer: &mut Vec<u8>,
     offset: usize
 ) -> (bool, usize) {
-    // Store the buffer size in advance, because rust will complain 
-    // about the buffer being borrowed mutably while it's borrowed
-    let buffer_size = buffer.len();
-
-    // Skip the first {offset} bytes that we still need to read from 
+    // Skip the first {offset} bytes that we still need to read from
     // the previous read operation
-    let mut writable_buffer_space = buffer[offset..].as_mut();
+    let mut filled = offset;
 
     loop {
-        match input.read(writable_buffer_space) {
-            // No bytes written, which means we've completely filled the buffer
-            // or we've reached the end of the file
-            Ok(0) => {
-                // No bytes written and the buffer slice has size zero. This means 
-                // that we've completely filled the buffer
-                if writable_buffer_space.is_empty() {
-                    // Create a very optimized reversed iterator over the newlines
-                    let mut lines_reversed = memrchr_iter(b'\n', buffer);
+        // The buffer is full
+        if filled == buffer.len() {
+            match memrchr(b'\n', buffer) {
+                // The last line is incomplete, so we only report the number
+                // of bytes that we've read till that last line. We add 1
+                // because we don't want to keep the newline.
+                Some(last_newline) => return (false, last_newline + 1),
 
-                    // The last line is incomplete, so we only report the number 
-                    // of bytes that we've read till that last line. We add 1
-                    // because we don't want to keep the newline.
-                    let bytes_read = lines_reversed.next().unwrap() + 1;
+                // A line longer than the buffer: grow the buffer until the line fits
+                None => buffer.resize(buffer.len().max(1) * 2, 0)
+            }
+        }
 
-                    // Return the number of bytes that we read
-                    return (false, bytes_read);
-                }
-
-                // No bytes written and a non-empty buffer indicates that we've 
-                // reached the end of the file
-                else {
-                    let bytes_read = buffer_size - writable_buffer_space.len();
-
-                    // Return the number of bytes that we read
-                    return (true, bytes_read);
-                }
-            },
+        match input.read(&mut buffer[filled..]) {
+            // No bytes read in a buffer with space left: the end of the input
+            Ok(0) => return (true, filled),
 
             // We've read {bytes_read} bytes
-            Ok(bytes_read) => {
-                // Shrink the writable buffer slice
-                writable_buffer_space = writable_buffer_space[bytes_read..].as_mut();
-            },
+            Ok(bytes_read) => filled += bytes_read,
+
+            Err(err) if err.kind() == ErrorKind::Interrupted => {},
 
             Err(err) => {
                 panic!("Error while reading input: {}", err);

@@ -121,3 +121,13 @@ fn test_keeps_a_last_line_without_a_newline() {
     assert_eq!(sorter(b"b\na\nc", &[]), b"a\nb\nc\n");
     assert_eq!(sorter(b"x\tb\ny\ta", &["-f", "2"]), b"y\ta\nx\tb\n");
 }
+
+#[test]
+fn test_sorts_lines_longer_than_the_buffer() {
+    // With 4 threads, each chunk gets a quarter of the buffer, so these lines are 12 times longer.
+    let mut lines = peptides(200, 6);
+    lines.push(vec![b'L'; 3000]);
+    lines.push(vec![b'A'; 5000]);
+
+    assert_eq!(sorter(&join_lines(&lines), &["-b", "1000"]), sorted(&lines));
+}
