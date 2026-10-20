@@ -18,7 +18,18 @@ fn sorter(input: &[u8], args: &[&str]) -> Vec<u8> {
     let input = input.to_vec();
     let writer = std::thread::spawn(move || stdin.write_all(&input).unwrap());
 
+    // A sorter still running after a minute is killed, so a sorter that hangs fails the test.
+    let pid = child.id();
+    let (done, finished) = std::sync::mpsc::channel::<()>();
+    let watchdog = std::thread::spawn(move || {
+        if finished.recv_timeout(std::time::Duration::from_secs(60)).is_err() {
+            let _ = Command::new("kill").arg(pid.to_string()).status();
+        }
+    });
+
     let output = child.wait_with_output().unwrap();
+    let _ = done.send(());
+    watchdog.join().unwrap();
     writer.join().unwrap();
 
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
@@ -98,4 +109,30 @@ fn test_sorts_from_a_field_to_the_end_of_the_line() {
 
     assert_eq!(output_keys, expected_keys);
     assert_eq!(sorted(&output_lines), sorted(&lines));
+}
+
+#[test]
+fn test_writes_nothing_for_empty_input() {
+    assert_eq!(sorter(b"", &[]), b"");
+}
+
+#[test]
+fn test_keeps_a_last_line_without_a_newline() {
+    assert_eq!(sorter(b"b\na\nc", &[]), b"a\nb\nc\n");
+    assert_eq!(sorter(b"x\tb\ny\ta", &["-f", "2"]), b"y\ta\nx\tb\n");
+}
+
+#[test]
+fn test_sorts_lines_longer_than_the_buffer() {
+    // With 4 threads, each chunk gets a quarter of the buffer, so these lines are 12 times longer.
+    let mut lines = peptides(200, 6);
+    lines.push(vec![b'L'; 3000]);
+    lines.push(vec![b'A'; 5000]);
+
+    assert_eq!(sorter(&join_lines(&lines), &["-b", "1000"]), sorted(&lines));
+}
+
+#[test]
+fn test_keeps_empty_lines() {
+    assert_eq!(sorter(b"b\n\na\n\n", &[]), b"\n\na\nb\n");
 }

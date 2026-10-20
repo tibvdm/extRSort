@@ -14,6 +14,8 @@ pub fn sort(
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
 
+    let mut started = 0;
+
     // Create new chunks while inside limits
     for _ in 0..config.threads {
         if let Some(unsorted_chunk) = input_chunks.next() {
@@ -24,7 +26,14 @@ pub fn sort(
                 sort_and_write(unsorted_chunk, &mut tmp_file);
                 let _ = sender.send(tmp_file.close());
             });
+
+            started += 1;
         }
+    }
+
+    // Empty input: no file will be sent, and the receiver below would wait forever
+    if started == 0 {
+        return tmp_files;
     }
 
     // Use an option in order to drop the sender inside the loop
