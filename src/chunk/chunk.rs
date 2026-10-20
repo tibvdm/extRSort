@@ -1,11 +1,24 @@
-use std::{io::{ErrorKind, Read, Write}, rc::Rc};
+use std::{io::{ErrorKind, Read, Write}, sync::Arc};
 
 use memchr::{memchr_iter, memrchr};
 
 use crate::{line::Line, Configuration};
 
+/// The largest chunk buffer, so the offsets of a line fit in a u32
+pub const MAX_CHUNK_SIZE: usize = u32::MAX as usize;
+
+/// Where a line is in the buffer of its chunk. The sort key runs from
+/// field_start to end.
+#[derive(Clone, Copy)]
+struct LineRange {
+    start: u32,
+    end: u32,
+    field_start: u32
+}
+
 pub struct Chunk {
-    lines: Vec<Line>,
+    buffer: Arc<Vec<u8>>,
+    lines: Vec<LineRange>,
     current_line: usize
 }
 
@@ -30,26 +43,30 @@ impl Chunk {
         if !completed {
             carry_over.extend_from_slice(&buffer[bytes_read..]);
         }
-
-        let buffer = Rc::new(buffer);
     
         // If we read some new bytes
         if bytes_read != 0 {
+            assert!(bytes_read <= MAX_CHUNK_SIZE, "A chunk can hold at most {} bytes", MAX_CHUNK_SIZE);
+
             let mut start_index = 0;
-            let mut lines = Vec::with_capacity(bytes_read);
+
+            // One more than the newlines, for a last line without one
+            let mut lines = Vec::with_capacity(memchr_iter(b'\n', &buffer[..bytes_read]).count() + 1);
 
             // Adds the line from start_index up to end_index, which is the newline or the end of the input
             let mut push_line = |start_index: usize, end_index: usize| {
-                if config.has_field() {
+                let field_start = if config.has_field() {
                     let offset = memchr_iter(config.delimiter, &buffer[start_index..end_index])
                         .skip(config.field - 2)
                         .next()
                         .expect("Fields should be correct");
 
-                    lines.push(Line::new_with_field(Rc::clone(&buffer), start_index, end_index, (start_index + offset, end_index)));
+                    start_index + offset
                 } else {
-                    lines.push(Line::new(Rc::clone(&buffer), start_index, end_index));
-                }
+                    start_index
+                };
+
+                lines.push(LineRange { start: start_index as u32, end: end_index as u32, field_start: field_start as u32 });
             };
 
             for end_index in memchr_iter(b'\n', &buffer[..bytes_read]) {
@@ -64,7 +81,7 @@ impl Chunk {
                 push_line(start_index, bytes_read);
             }
 
-            return Some(Chunk { lines, current_line: 0 });
+            return Some(Chunk { buffer: Arc::new(buffer), lines, current_line: 0 });
         }
     
         None
@@ -72,12 +89,16 @@ impl Chunk {
 
     pub fn write<W: Write>(&self, writer: &mut W) {
         for line in &self.lines {
-            line.write(writer);
+            writer.write_all(&self.buffer[line.start as usize..line.end as usize]).unwrap();
+            writer.write_all(b"\n").unwrap();
         }
     }
 
     pub fn sort_unstable(&mut self) {
-        self.lines.sort_unstable_by(|a, b| b.cmp(a));
+        let buffer = &self.buffer;
+        let key = |line: &LineRange| &buffer[line.field_start as usize..line.end as usize];
+
+        self.lines.sort_unstable_by(|a, b| key(a).cmp(key(b)));
     }
 }
 
@@ -87,7 +108,12 @@ impl Iterator for Chunk {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(line) = self.lines.get(self.current_line) {
             self.current_line += 1;
-            return Some(line.clone());
+            return Some(Line::new_with_field(
+                Arc::clone(&self.buffer),
+                line.start as usize,
+                line.end as usize,
+                (line.field_start as usize, line.end as usize)
+            ));
         }
 
         None
