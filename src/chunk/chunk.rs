@@ -16,10 +16,14 @@ struct LineRange {
     field_start: u32
 }
 
+/// The memory a line takes in a chunk, next to its bytes
+pub const LINE_OVERHEAD: usize = std::mem::size_of::<LineRange>();
+
 pub struct Chunk {
     buffer: Arc<Vec<u8>>,
     lines: Vec<LineRange>,
-    current_line: usize
+    current_line: usize,
+    bytes: usize
 }
 
 impl Chunk {
@@ -81,10 +85,15 @@ impl Chunk {
                 push_line(start_index, bytes_read);
             }
 
-            return Some(Chunk { buffer: Arc::new(buffer), lines, current_line: 0 });
+            return Some(Chunk { buffer: Arc::new(buffer), lines, current_line: 0, bytes: bytes_read });
         }
     
         None
+    }
+
+    /// The average number of input bytes per line, newline included
+    pub fn bytes_per_line(&self) -> usize {
+        (self.bytes / self.lines.len().max(1)).max(1)
     }
 
     pub fn write<W: Write>(&self, writer: &mut W) {
