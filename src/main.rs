@@ -51,7 +51,7 @@ pub struct SortArgs {
     pub buffer_size: usize,
 
     /// Number of threads to use
-    #[arg(short = 'p', long = "parallel", default_value_t = 4)]
+    #[arg(short = 'p', long = "parallel", default_value_t = 4, value_parser = parse_threads)]
     pub threads: usize,
 
     /// Delimiter to use
@@ -65,6 +65,14 @@ pub struct SortArgs {
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {
     s.chars().next().ok_or_else(|| "Invalid delimiter".to_string()).map(|c| c as u8)
+}
+
+fn parse_threads(s: &str) -> Result<usize, String> {
+    match s.parse::<usize>() {
+        Ok(0) => Err("at least one thread is needed".to_string()),
+        Ok(threads) => Ok(threads),
+        Err(err) => Err(err.to_string())
+    }
 }
 
 fn parse_size(s: &str) -> Result<usize, String> {
