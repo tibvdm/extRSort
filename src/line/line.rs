@@ -1,11 +1,11 @@
-use std::{rc::Rc, io::Write};
+use std::{io::Write, sync::Arc};
 
 /// A struct representing a single line of bytes
 #[derive(Clone, Debug)]
 pub struct Line {
     /// The buffer containing the bytes of the line
-    /// We use a Reference counting smart pointer here to avoid copying the buffer for each individual line
-    buffer: Rc<Vec<u8>>,
+    /// Shared with the other lines of the chunk, so the buffer is not copied for each line
+    buffer: Arc<Vec<u8>>,
 
     /// The index of the first byte of this line in the buffer
     start: usize,
@@ -30,7 +30,8 @@ impl Line {
     /// # Returns
     /// 
     /// A new `Line` instance
-    pub fn new(buffer: Rc<Vec<u8>>, start: usize, end: usize) -> Self {
+    #[cfg(test)]
+    pub fn new(buffer: Arc<Vec<u8>>, start: usize, end: usize) -> Self {
         Line { buffer, start, end, field: (start, end) }
     }
 
@@ -46,7 +47,7 @@ impl Line {
     /// # Returns
     /// 
     /// A new `Line` instance
-    pub fn new_with_field(buffer: Rc<Vec<u8>>, start: usize, end: usize, field: (usize, usize)) -> Self {
+    pub fn new_with_field(buffer: Arc<Vec<u8>>, start: usize, end: usize, field: (usize, usize)) -> Self {
         Line { buffer, start, end, field }
     }
 
@@ -70,8 +71,6 @@ impl Line {
         &self.buffer[self.field.0..self.field.1]
     }
 }
-
-unsafe impl Send for Line {}
 
 impl PartialEq for Line {
     fn eq(&self, other: &Self) -> bool {
@@ -97,15 +96,15 @@ impl Ord for Line {
 mod tests {
     use super::*;
 
-    fn construct_rc_buffer(content: &str) -> Rc<Vec<u8>> {
-        Rc::new(content.as_bytes().to_vec())
+    fn construct_rc_buffer(content: &str) -> Arc<Vec<u8>> {
+        Arc::new(content.as_bytes().to_vec())
     }
 
     #[test]
     fn test_new() {
         let buffer = construct_rc_buffer("AAACLNNYAA");
 
-        let line = Line::new(Rc::clone(&buffer), 0, 10);
+        let line = Line::new(Arc::clone(&buffer), 0, 10);
 
         assert_eq!(line.as_bytes(), "AAACLNNYAA".as_bytes());
     }
@@ -114,7 +113,7 @@ mod tests {
     fn test_new_with_field() {
         let buffer = construct_rc_buffer("AAACLNNYAA");
 
-        let line = Line::new_with_field(Rc::clone(&buffer), 0, 10, (1, 9));
+        let line = Line::new_with_field(Arc::clone(&buffer), 0, 10, (1, 9));
 
         assert_eq!(line.as_bytes(), "AAACLNNYAA".as_bytes());
         assert_eq!(line.as_sort_bytes(), "AACLNNYA".as_bytes());
@@ -124,7 +123,7 @@ mod tests {
     fn test_write() {
         let buffer = construct_rc_buffer("AAACLNNYAA");
 
-        let line = Line::new(Rc::clone(&buffer), 0, 10);
+        let line = Line::new(Arc::clone(&buffer), 0, 10);
 
         let mut output = vec![];
         line.write(&mut output);
@@ -136,8 +135,8 @@ mod tests {
     fn test_as_bytes() {
         let buffer = construct_rc_buffer("AAACLNNYAA");
 
-        let line = Line::new(Rc::clone(&buffer), 0, 10);
-        let line_with_field = Line::new_with_field(Rc::clone(&buffer), 0, 10, (1, 9));
+        let line = Line::new(Arc::clone(&buffer), 0, 10);
+        let line_with_field = Line::new_with_field(Arc::clone(&buffer), 0, 10, (1, 9));
 
         assert_eq!(line.as_bytes(), "AAACLNNYAA".as_bytes());
         assert_eq!(line_with_field.as_bytes(), "AAACLNNYAA".as_bytes());
@@ -147,8 +146,8 @@ mod tests {
     fn test_as_sort_bytes() {
         let buffer = construct_rc_buffer("AAACLNNYAA");
 
-        let line = Line::new(Rc::clone(&buffer), 0, 10);
-        let line_with_field = Line::new_with_field(Rc::clone(&buffer), 0, 10, (1, 9));
+        let line = Line::new(Arc::clone(&buffer), 0, 10);
+        let line_with_field = Line::new_with_field(Arc::clone(&buffer), 0, 10, (1, 9));
 
         assert_eq!(line.as_sort_bytes(), "AAACLNNYAA".as_bytes());
         assert_eq!(line_with_field.as_sort_bytes(), "AACLNNYA".as_bytes());
@@ -158,10 +157,10 @@ mod tests {
     fn test_cmp() {
         let buffer = construct_rc_buffer("AAACL\nAAA\nCAAALTER\nAAA\n");
 
-        let line1 = Line::new(Rc::clone(&buffer), 0, 5);
-        let line2 = Line::new(Rc::clone(&buffer), 6, 9);
-        let line3 = Line::new(Rc::clone(&buffer), 10, 18);
-        let line4 = Line::new(Rc::clone(&buffer), 19, 22);
+        let line1 = Line::new(Arc::clone(&buffer), 0, 5);
+        let line2 = Line::new(Arc::clone(&buffer), 6, 9);
+        let line3 = Line::new(Arc::clone(&buffer), 10, 18);
+        let line4 = Line::new(Arc::clone(&buffer), 19, 22);
 
         assert_eq!(line1 < line2, true);
         assert_eq!(line1 > line3, true);

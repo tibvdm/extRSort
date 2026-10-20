@@ -57,12 +57,12 @@ impl<R: Read> Iterator for Lines<R> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use super::*;
 
-    fn construct_rc_buffer(content: &str) -> Rc<Vec<u8>> {
-        Rc::new(content.as_bytes().to_vec())
+    fn construct_rc_buffer(content: &str) -> Arc<Vec<u8>> {
+        Arc::new(content.as_bytes().to_vec())
     }
 
     #[test]
