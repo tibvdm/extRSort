@@ -44,6 +44,9 @@ impl<R: Read> Iterator for Lines<R> {
             }
         }
 
+        // Free the used chunk before the next one is read, so they are not in memory together
+        self.chunk = None;
+
         // If there is no chunk, try to get the next chunk
         if let Some(next_chunk) = self.chunks.next() {
             self.chunk = Some(next_chunk);

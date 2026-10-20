@@ -34,8 +34,11 @@ pub fn merge(
         let sender = file_sender.clone();
         let config = config.clone();
 
+        // The merge jobs run side by side, so each gets its share of the buffer
+        let memory = config.buffer_size / config.threads;
+
         sorter_pool.execute(move || {
-            let merged = catch_unwind(AssertUnwindSafe(|| merge_and_write(file_batch, &mut tmp_file, config)));
+            let merged = catch_unwind(AssertUnwindSafe(|| merge_and_write(file_batch, &mut tmp_file, config, memory)));
             let _ = sender.send(merged.map_err(|_| io::Error::other("a merge job failed")).and_then(|_| tmp_file.finish()));
         });
     }
@@ -51,12 +54,13 @@ pub fn merge(
     return Ok(tmp_files);
 }
 
-pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config: Configuration) {
+/// Merges sorted files into `file`, with at most `memory` bytes for the lines of all files together
+pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config: Configuration, memory: usize) {
     if files.is_empty() {
         return;
     }
 
-    let buffer_size = min(40 * MB as usize, config.buffer_size / files.len());
+    let buffer_size = min(40 * MB as usize, memory / files.len());
 
     let mut opened_files: Vec<TmpFileReader> = files
         .into_iter()
@@ -78,6 +82,9 @@ pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config:
 
     while let Some((line, lines_index)) = heap.pop() {
         line.write(file);
+
+        // The line holds its chunk, which the next line may replace
+        drop(line);
 
         if let Some(new_line) = lines_iterators[lines_index].next() {
             heap.push((new_line, lines_index));
