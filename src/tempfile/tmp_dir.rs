@@ -1,5 +1,6 @@
 use std::{path::{PathBuf, Path}, fs::{create_dir_all, read_dir, remove_file, remove_dir}, process::exit};
 
+use signal_hook::{consts::{SIGINT, SIGTERM}, iterator::Signals};
 use tempfile;
 
 use super::tmp_file::TmpFileWriter;
@@ -36,11 +37,15 @@ impl<'a> TmpDirBuilder<'a> {
 
         let tmp_path = tmp_dir.path().to_owned();
 
-        // Set a handler in case the program is interrupted or terminated (SIGINT, SIGTERM, SIGHUP)
-        ctrlc::set_handler(move || {
-            delete_tmp_dir_and_files(&tmp_path);
-            exit(1);
-        }).expect("Error setting Ctrl-C handler"); // TODO: map_err
+        // Remove the temporary files when the program is interrupted or terminated. SIGHUP is not
+        // handled, so a sorter started with nohup keeps ignoring it.
+        let mut signals = Signals::new([SIGINT, SIGTERM]).expect("Error setting the signal handler");
+        std::thread::spawn(move || {
+            if signals.forever().next().is_some() {
+                delete_tmp_dir_and_files(&tmp_path);
+                exit(1);
+            }
+        });
 
         TmpDir { tmp_dir, file_count: 0 }
     }

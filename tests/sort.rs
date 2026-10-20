@@ -170,3 +170,76 @@ fn test_fails_when_the_output_cannot_be_written() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("No space left on device"));
 }
+
+/// Starts the sorter with its temporary files in `location`, and gives it half of the input, so it
+/// is still running. With `nohup`, it starts with SIGHUP ignored.
+fn running_sorter(location: &std::path::Path, nohup: bool) -> (std::process::Child, Vec<Vec<u8>>) {
+    let lines = peptides(40_000, 9);
+    let (program, args): (&str, Vec<&str>) = if nohup {
+        ("nohup", vec![env!("CARGO_BIN_EXE_sorter")])
+    } else {
+        (env!("CARGO_BIN_EXE_sorter"), vec![])
+    };
+
+    let mut child = Command::new(program)
+        .args(args)
+        .args(["-b", "20000", "-t", location.to_str().unwrap()])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    child.stdin.as_mut().unwrap().write_all(&join_lines(&lines[..20_000])).unwrap();
+
+    // Wait until the sorter has written a sorted chunk into its temporary directory, which it makes
+    // before it sets its signal handler
+    let chunk_files = || {
+        std::fs::read_dir(location)
+            .map(|dir| dir.flatten().map(|tmp_dir| std::fs::read_dir(tmp_dir.path()).map(|files| files.count()).unwrap_or(0)).sum())
+            .unwrap_or(0)
+    };
+    let started = std::time::Instant::now();
+    while chunk_files() == 0 {
+        assert!(started.elapsed().as_secs() < 30, "the sorter wrote no sorted chunk");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+
+    (child, lines)
+}
+
+fn signal(child: &std::process::Child, name: &str) {
+    assert!(Command::new("kill").args([format!("-{}", name), child.id().to_string()]).status().unwrap().success());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_removes_its_temporary_files_on_sigterm() {
+    let location = std::env::temp_dir().join(format!("extrsort-sigterm-{}", std::process::id()));
+    let (mut child, _) = running_sorter(&location, false);
+
+    signal(&child, "TERM");
+    let status = child.wait().unwrap();
+
+    assert!(!status.success());
+    assert_eq!(std::fs::read_dir(&location).unwrap().count(), 0);
+    std::fs::remove_dir_all(location).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn test_keeps_sorting_on_sighup_under_nohup() {
+    let location = std::env::temp_dir().join(format!("extrsort-sighup-{}", std::process::id()));
+    let (mut child, lines) = running_sorter(&location, true);
+
+    signal(&child, "HUP");
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    assert!(child.try_wait().unwrap().is_none(), "the sorter stopped on SIGHUP");
+
+    child.stdin.take().unwrap().write_all(&join_lines(&lines[20_000..])).unwrap();
+    let output = child.wait_with_output().unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(output.stdout, sorted(&lines));
+    std::fs::remove_dir_all(location).unwrap();
+}
