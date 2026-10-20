@@ -136,3 +136,18 @@ fn test_sorts_lines_longer_than_the_buffer() {
 fn test_keeps_empty_lines() {
     assert_eq!(sorter(b"b\n\na\n\n", &[]), b"\n\na\nb\n");
 }
+
+#[test]
+fn test_writes_its_temporary_files_in_the_temp_dir() {
+    // A directory that does not exist yet, so it only appears when the sorter uses --temp-dir
+    let location = std::env::temp_dir().join(format!("extrsort-test-{}", std::process::id())).join("nested");
+    let lines = peptides(20_000, 8);
+
+    let output = sorter(&join_lines(&lines), &["-b", "20000", "-t", location.to_str().unwrap()]);
+
+    assert_eq!(output, sorted(&lines));
+    assert!(location.is_dir());
+    assert_eq!(std::fs::read_dir(&location).unwrap().count(), 0, "the sorter removes its own directory");
+
+    std::fs::remove_dir_all(location.parent().unwrap()).unwrap();
+}
