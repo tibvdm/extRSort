@@ -243,3 +243,12 @@ fn test_keeps_sorting_on_sighup_under_nohup() {
     assert_eq!(output.stdout, sorted(&lines));
     std::fs::remove_dir_all(location).unwrap();
 }
+
+#[test]
+fn test_reads_the_buffer_size_with_a_unit() {
+    let lines = peptides(20_000, 7);
+
+    for size in ["20000", "20kB", "20KiB", "0.02MB"] {
+        assert_eq!(sorter(&join_lines(&lines), &["-b", size]), sorted(&lines), "-b {}", size);
+    }
+}

@@ -1,5 +1,6 @@
 use std::{io::{self, BufReader, BufWriter, Write}, path::PathBuf, process::exit};
 
+use bytesize::ByteSize;
 use sorter::{TmpDirBuilder, external_sort, Configuration};
 use structopt::StructOpt;
 
@@ -45,8 +46,8 @@ pub struct SortArgs {
     #[structopt(short = "t", long = "temp-dir", default_value = "/tmp/sort-rs", parse(from_os_str))]
     pub tmp_dir: PathBuf,
 
-    /// Buffer size in bytes
-    #[structopt(short = "b", long = "buffer-size", default_value = "400000000")]
+    /// Buffer size: bytes, or a size such as 400MB, 2G (2 * 10^9) or 2GiB (2 * 2^30)
+    #[structopt(short = "b", long = "buffer-size", default_value = "400MB", parse(try_from_str = parse_size))]
     pub buffer_size: usize,
 
     /// Number of threads to use
@@ -64,4 +65,8 @@ pub struct SortArgs {
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {
     s.chars().next().ok_or_else(|| "Invalid delimiter".to_string()).map(|c| c as u8)
+}
+
+fn parse_size(s: &str) -> Result<usize, String> {
+    s.parse::<ByteSize>().map(|size| size.as_u64() as usize)
 }
