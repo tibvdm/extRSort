@@ -252,3 +252,34 @@ fn test_reads_the_buffer_size_with_a_unit() {
         assert_eq!(sorter(&join_lines(&lines), &["-b", size]), sorted(&lines), "-b {}", size);
     }
 }
+
+/// The exit status and stderr of the sorter with these arguments, on a little input.
+fn sorter_fails(args: &[&str]) -> (bool, String) {
+    let output = Command::new(env!("CARGO_BIN_EXE_sorter"))
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .unwrap();
+
+    (!output.status.success(), String::from_utf8_lossy(&output.stderr).into_owned())
+}
+
+#[test]
+fn test_rejects_zero_threads() {
+    let (failed, stderr) = sorter_fails(&["-p", "0"]);
+
+    assert!(failed);
+    assert!(stderr.contains("at least one thread is needed"), "{}", stderr);
+}
+
+#[test]
+fn test_rejects_a_delimiter_that_is_not_one_ascii_character() {
+    for delimiter in ["\u{a7}", "ab", ""] {
+        let (failed, stderr) = sorter_fails(&["-f", "2", "-d", delimiter]);
+
+        assert!(failed, "-d {:?}", delimiter);
+        assert!(stderr.contains("the delimiter must be one ASCII character"), "{}", stderr);
+    }
+}

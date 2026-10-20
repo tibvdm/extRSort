@@ -2,10 +2,10 @@ use std::{io::{self, BufReader, BufWriter, Write}, path::PathBuf, process::exit}
 
 use bytesize::ByteSize;
 use sorter::{TmpDirBuilder, external_sort, Configuration};
-use structopt::StructOpt;
+use clap::Parser;
 
 fn main() {
-    let args = SortArgs::from_args();
+    let args = SortArgs::parse();
 
     let stdin = io::stdin();
     let stdout = io::stdout();
@@ -40,31 +40,43 @@ fn main() {
     }
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct SortArgs {
     /// Directory to store temporary files
-    #[structopt(short = "t", long = "temp-dir", default_value = "/tmp/sort-rs", parse(from_os_str))]
+    #[arg(short = 't', long = "temp-dir", default_value = "/tmp/sort-rs")]
     pub tmp_dir: PathBuf,
 
     /// Buffer size: bytes, or a size such as 400MB, 2G (2 * 10^9) or 2GiB (2 * 2^30)
-    #[structopt(short = "b", long = "buffer-size", default_value = "400MB", parse(try_from_str = parse_size))]
+    #[arg(short = 'b', long = "buffer-size", default_value = "400MB", value_parser = parse_size)]
     pub buffer_size: usize,
 
     /// Number of threads to use
-    #[structopt(short = "p", long = "parallel", default_value = "4")]
+    #[arg(short = 'p', long = "parallel", default_value_t = 4, value_parser = parse_threads)]
     pub threads: usize,
 
     /// Delimiter to use
-    #[structopt(short = "d", long = "delimiter", default_value = "\t", parse(try_from_str = parse_delimiter))]
+    #[arg(short = 'd', long = "delimiter", default_value = "\t", value_parser = parse_delimiter)]
     pub delimiter: u8,
 
     /// Field to sort on
-    #[structopt(short = "f", long = "field", default_value = "1")]
+    #[arg(short = 'f', long = "field", default_value_t = 1)]
     pub field: usize
 }
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {
-    s.chars().next().ok_or_else(|| "Invalid delimiter".to_string()).map(|c| c as u8)
+    // The delimiter is compared as one byte, so it has to be one ASCII character
+    match s.as_bytes() {
+        [byte] if byte.is_ascii() => Ok(*byte),
+        _ => Err("the delimiter must be one ASCII character".to_string())
+    }
+}
+
+fn parse_threads(s: &str) -> Result<usize, String> {
+    match s.parse::<usize>() {
+        Ok(0) => Err("at least one thread is needed".to_string()),
+        Ok(threads) => Ok(threads),
+        Err(err) => Err(err.to_string())
+    }
 }
 
 fn parse_size(s: &str) -> Result<usize, String> {
