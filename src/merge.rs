@@ -50,6 +50,10 @@ pub fn merge(
 }
 
 pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config: Configuration) {
+    if files.is_empty() {
+        return;
+    }
+
     let buffer_size = min(40 * MB as usize, config.buffer_size / files.len());
 
     let mut opened_files: Vec<TmpFileReader> = files

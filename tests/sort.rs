@@ -18,7 +18,18 @@ fn sorter(input: &[u8], args: &[&str]) -> Vec<u8> {
     let input = input.to_vec();
     let writer = std::thread::spawn(move || stdin.write_all(&input).unwrap());
 
+    // A sorter still running after a minute is killed, so a sorter that hangs fails the test.
+    let pid = child.id();
+    let (done, finished) = std::sync::mpsc::channel::<()>();
+    let watchdog = std::thread::spawn(move || {
+        if finished.recv_timeout(std::time::Duration::from_secs(60)).is_err() {
+            let _ = Command::new("kill").arg(pid.to_string()).status();
+        }
+    });
+
     let output = child.wait_with_output().unwrap();
+    let _ = done.send(());
+    watchdog.join().unwrap();
     writer.join().unwrap();
 
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
@@ -98,4 +109,9 @@ fn test_sorts_from_a_field_to_the_end_of_the_line() {
 
     assert_eq!(output_keys, expected_keys);
     assert_eq!(sorted(&output_lines), sorted(&lines));
+}
+
+#[test]
+fn test_writes_nothing_for_empty_input() {
+    assert_eq!(sorter(b"", &[]), b"");
 }
