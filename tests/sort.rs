@@ -151,3 +151,22 @@ fn test_writes_its_temporary_files_in_the_temp_dir() {
 
     std::fs::remove_dir_all(location.parent().unwrap()).unwrap();
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn test_fails_when_the_output_cannot_be_written() {
+    // /dev/full fails every write. The output fits in the stdout buffer, so only the last flush fails.
+    let output = Command::new(env!("CARGO_BIN_EXE_sorter"))
+        .stdin(Stdio::piped())
+        .stdout(std::fs::File::create("/dev/full").unwrap())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut child| {
+            child.stdin.take().unwrap().write_all(b"b\na\n")?;
+            child.wait_with_output()
+        })
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("No space left on device"));
+}
