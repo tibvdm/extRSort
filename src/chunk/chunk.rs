@@ -37,7 +37,8 @@ impl Chunk {
             let mut start_index = 0;
             let mut lines = Vec::with_capacity(bytes_read);
 
-            for end_index in memchr_iter(b'\n', &buffer[..bytes_read]) {
+            // Adds the line from start_index up to end_index, which is the newline or the end of the input
+            let mut push_line = |start_index: usize, end_index: usize| {
                 if config.has_field() {
                     let offset = memchr_iter(config.delimiter, &buffer[start_index..end_index])
                         .skip(config.field - 2)
@@ -48,9 +49,18 @@ impl Chunk {
                 } else {
                     lines.push(Line::new(Rc::clone(&buffer), start_index, end_index - 1));
                 }
+            };
+
+            for end_index in memchr_iter(b'\n', &buffer[..bytes_read]) {
+                push_line(start_index, end_index);
 
                 // End index includes the newline
                 start_index = end_index + 1;
+            }
+
+            // The last line of the input, when it does not end in a newline
+            if completed && start_index < bytes_read {
+                push_line(start_index, bytes_read);
             }
 
             return Some(Chunk { lines, current_line: 0 });

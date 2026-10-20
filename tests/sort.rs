@@ -115,3 +115,9 @@ fn test_sorts_from_a_field_to_the_end_of_the_line() {
 fn test_writes_nothing_for_empty_input() {
     assert_eq!(sorter(b"", &[]), b"");
 }
+
+#[test]
+fn test_keeps_a_last_line_without_a_newline() {
+    assert_eq!(sorter(b"b\na\nc", &[]), b"a\nb\nc\n");
+    assert_eq!(sorter(b"x\tb\ny\ta", &["-f", "2"]), b"y\ta\nx\tb\n");
+}
