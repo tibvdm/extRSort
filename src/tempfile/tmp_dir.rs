@@ -36,7 +36,7 @@ impl<'a> TmpDirBuilder<'a> {
 
         let tmp_path = tmp_dir.path().to_owned();
 
-        // Set a handler in case a user interrupts the program (SIGINT)
+        // Set a handler in case the program is interrupted or terminated (SIGINT, SIGTERM, SIGHUP)
         ctrlc::set_handler(move || {
             delete_tmp_dir_and_files(&tmp_path);
             exit(1);

@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 bytesize = "1.2.0"
-ctrlc = "3.4.0"
+ctrlc = { version = "3.4.0", features = ["termination"] }
 memchr = "2.5.0"
 rayon = "1.7.0"
 self_cell = "1.0.1"
