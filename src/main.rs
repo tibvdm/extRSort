@@ -1,4 +1,4 @@
-use std::{io::{self, BufReader, BufWriter}, path::PathBuf};
+use std::{io::{self, BufReader, BufWriter, Write}, path::PathBuf, process::exit};
 
 use sorter::{TmpDirBuilder, external_sort, Configuration};
 use structopt::StructOpt;
@@ -22,12 +22,21 @@ fn main() {
         ..Configuration::default()
     };
 
-    external_sort(
+    // The flush is checked here: dropping output_writer would ignore a failed last write
+    let sorted = external_sort(
         &mut input_reader,
         &mut output_writer,
         &mut tmp_dir,
         config
-    );
+    ).and_then(|_| output_writer.flush());
+
+    if let Err(err) = sorted {
+        eprintln!("sorter: {}", err);
+
+        // exit skips destructors, so the temporary directory is removed here
+        drop(tmp_dir);
+        exit(1);
+    }
 }
 
 #[derive(Debug, StructOpt)]

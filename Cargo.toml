@@ -7,10 +7,10 @@ edition = "2021"
 
 [dependencies]
 bytesize = "1.2.0"
-ctrlc = "3.4.0"
 memchr = "2.5.0"
 rayon = "1.7.0"
 self_cell = "1.0.1"
+signal-hook = "0.3"
 structopt = "0.3.26"
 tempfile = "3.7.1"
 threadpool = "1.8.1"

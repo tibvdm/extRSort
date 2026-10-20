@@ -1,15 +1,15 @@
-use std::{io::{Read, Write}, sync::mpsc::channel};
+use std::{io::{self, Read, Write}, panic::{catch_unwind, AssertUnwindSafe}, sync::mpsc::channel};
 
 use threadpool::ThreadPool;
 
-use crate::{chunk::{Chunks, Chunk}, tempfile::{TmpDir, ClosedTmpFile, TmpFileOpened}, Configuration};
+use crate::{chunk::{Chunks, Chunk}, tempfile::{TmpDir, ClosedTmpFile}, Configuration};
 
 pub fn sort(
     input_chunks: &mut Chunks<impl Read>,
     sorter_pool: &ThreadPool,
     tmp_dir: &mut TmpDir,
     config: &Configuration
-) -> Vec<ClosedTmpFile> {
+) -> io::Result<Vec<ClosedTmpFile>> {
     let (file_sender, file_receiver) = channel();
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
@@ -23,8 +23,8 @@ pub fn sort(
             let sender = file_sender.clone();
 
             sorter_pool.execute(move || {
-                sort_and_write(unsorted_chunk, &mut tmp_file);
-                let _ = sender.send(tmp_file.close());
+                let sorted = catch_unwind(AssertUnwindSafe(|| sort_and_write(unsorted_chunk, &mut tmp_file)));
+                let _ = sender.send(sorted.map_err(|_| io::Error::other("a sort job failed")).and_then(|_| tmp_file.finish()));
             });
 
             started += 1;
@@ -33,7 +33,7 @@ pub fn sort(
 
     // Empty input: no file will be sent, and the receiver below would wait forever
     if started == 0 {
-        return tmp_files;
+        return Ok(tmp_files);
     }
 
     // Use an option in order to drop the sender inside the loop
@@ -41,7 +41,8 @@ pub fn sort(
 
     // While there is at least a single sender connected to this receiver
     while let Ok(file) = file_receiver.recv() {
-        tmp_files.push(file);
+        // A job that panicked or could not write its file, for example on a full disk, sends an error
+        tmp_files.push(file?);
 
         if let Some(sender) = &option_sender {
             match input_chunks.next() {
@@ -50,8 +51,8 @@ pub fn sort(
                     let sender = sender.clone();
                     
                     sorter_pool.execute(move || {
-                        sort_and_write(unsorted_chunk, &mut tmp_file);
-                        let _ = sender.send(tmp_file.close());
+                        let sorted = catch_unwind(AssertUnwindSafe(|| sort_and_write(unsorted_chunk, &mut tmp_file)));
+                        let _ = sender.send(sorted.map_err(|_| io::Error::other("a sort job failed")).and_then(|_| tmp_file.finish()));
                     });
                 },
                 None => option_sender = None
@@ -59,7 +60,7 @@ pub fn sort(
         }
     }
 
-    return tmp_files;
+    return Ok(tmp_files);
 }
 
 /// Sorts a chunk and writes it to a file

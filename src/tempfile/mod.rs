@@ -4,7 +4,6 @@ mod tmp_file;
 pub use tmp_dir::TmpDir;
 pub use tmp_dir::TmpDirBuilder;
 
-pub use tmp_file::TmpFileOpened;
 pub use tmp_file::TmpFileClosed;
 pub use tmp_file::TmpFileWrite;
 pub use tmp_file::TmpFileRead;
