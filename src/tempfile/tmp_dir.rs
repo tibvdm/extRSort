@@ -1,4 +1,4 @@
-use std::{path::{PathBuf, Path}, fs::{read_dir, remove_file, remove_dir}, process::exit};
+use std::{path::{PathBuf, Path}, fs::{create_dir_all, read_dir, remove_file, remove_dir}, process::exit};
 
 use tempfile;
 
@@ -23,11 +23,15 @@ impl<'a> TmpDirBuilder<'a> {
 
     pub fn build(&mut self) -> TmpDir {
         let default_location = PathBuf::from(DEFAULT_TMP_DIR);
+        let location = self.location.unwrap_or_else(|| &default_location);
+
+        // The location may not exist yet, for example the default of --temp-dir
+        create_dir_all(location).expect("Failed to create the location of the temporary directory");
 
         // Create a new temporary directory
         let tmp_dir = tempfile::Builder::new()
             .prefix("extsort")
-            .tempdir_in(self.location.unwrap_or_else(|| &default_location))
+            .tempdir_in(location)
             .expect("Failed to create temporary directory"); // TODO: map_err
 
         let tmp_path = tmp_dir.path().to_owned();
