@@ -46,9 +46,9 @@ impl Chunk {
                         .next()
                         .expect("Fields should be correct");
 
-                    lines.push(Line::new_with_field(Rc::clone(&buffer), start_index, end_index - 1, (start_index + offset, end_index - 1)));
+                    lines.push(Line::new_with_field(Rc::clone(&buffer), start_index, end_index, (start_index + offset, end_index)));
                 } else {
-                    lines.push(Line::new(Rc::clone(&buffer), start_index, end_index - 1));
+                    lines.push(Line::new(Rc::clone(&buffer), start_index, end_index));
                 }
             };
 

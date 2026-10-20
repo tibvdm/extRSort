@@ -74,9 +74,9 @@ mod tests {
 
         let buffer = construct_rc_buffer("AAACLNNYAA\nAAAAAALTER\nKYYLMMAAFG\n");
 
-        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 0, 9)));
-        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 11, 20)));
-        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 22, 31)));
+        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 0, 10)));
+        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 11, 21)));
+        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 22, 32)));
         assert_eq!(lines.next(), None);
     }
 
@@ -89,9 +89,9 @@ mod tests {
 
         let buffer = construct_rc_buffer("AAACLNNYAA\nAAAAAALTER\nKYYLMMAAFG\n");
 
-        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 0, 9)));
-        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 11, 20)));
-        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 22, 31)));
+        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 0, 10)));
+        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 11, 21)));
+        assert_eq!(lines.next(), Some(Line::new(buffer.clone(), 22, 32)));
         assert_eq!(lines.next(), None);
     }
 }

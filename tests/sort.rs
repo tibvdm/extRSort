@@ -131,3 +131,8 @@ fn test_sorts_lines_longer_than_the_buffer() {
 
     assert_eq!(sorter(&join_lines(&lines), &["-b", "1000"]), sorted(&lines));
 }
+
+#[test]
+fn test_keeps_empty_lines() {
+    assert_eq!(sorter(b"b\n\na\n\n", &[]), b"\n\na\nb\n");
+}
