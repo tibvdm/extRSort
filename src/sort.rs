@@ -2,7 +2,7 @@ use std::{io::{self, Read, Write}, panic::{catch_unwind, AssertUnwindSafe}, sync
 
 use threadpool::ThreadPool;
 
-use crate::{chunk::{Chunks, Chunk}, tempfile::{TmpDir, ClosedTmpFile, TmpFileOpened}, Configuration};
+use crate::{chunk::{Chunks, Chunk}, tempfile::{TmpDir, ClosedTmpFile}, Configuration};
 
 pub fn sort(
     input_chunks: &mut Chunks<impl Read>,
@@ -24,7 +24,7 @@ pub fn sort(
 
             sorter_pool.execute(move || {
                 let sorted = catch_unwind(AssertUnwindSafe(|| sort_and_write(unsorted_chunk, &mut tmp_file)));
-                let _ = sender.send(sorted.map(|_| tmp_file.close()));
+                let _ = sender.send(sorted.map_err(|_| io::Error::other("a sort job failed")).and_then(|_| tmp_file.finish()));
             });
 
             started += 1;
@@ -41,8 +41,8 @@ pub fn sort(
 
     // While there is at least a single sender connected to this receiver
     while let Ok(file) = file_receiver.recv() {
-        // A job that panicked, for example on a full disk, sends no file
-        tmp_files.push(file.map_err(|_| io::Error::other("a sort job failed"))?);
+        // A job that panicked or could not write its file, for example on a full disk, sends an error
+        tmp_files.push(file?);
 
         if let Some(sender) = &option_sender {
             match input_chunks.next() {
@@ -52,7 +52,7 @@ pub fn sort(
                     
                     sorter_pool.execute(move || {
                         let sorted = catch_unwind(AssertUnwindSafe(|| sort_and_write(unsorted_chunk, &mut tmp_file)));
-                        let _ = sender.send(sorted.map(|_| tmp_file.close()));
+                        let _ = sender.send(sorted.map_err(|_| io::Error::other("a sort job failed")).and_then(|_| tmp_file.finish()));
                     });
                 },
                 None => option_sender = None

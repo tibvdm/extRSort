@@ -52,6 +52,15 @@ impl TmpFileOpened for TmpFileWriter {
     }
 }
 
+impl TmpFileWriter {
+    /// Writes the buffered bytes to the file and closes it. Unlike close, it reports a failed
+    /// last write, for example on a full disk.
+    pub fn finish(mut self) -> std::io::Result<ClosedTmpFile> {
+        self.file.flush()?;
+        Ok(self.close())
+    }
+}
+
 impl From<PathBuf> for TmpFileWriter {
     fn from(path: PathBuf) -> Self {
         let file = BufWriter::new(File::create(&path).unwrap());
