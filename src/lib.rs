@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 
 use chunk::Chunks;
 use crate::tempfile::TmpDir;
@@ -21,21 +21,29 @@ pub fn external_sort(
     output: &mut impl Write,
     tmp_dir: &mut TmpDir,
     config: Configuration
-) {
+) -> io::Result<()> {
     // Threadpool for sorting and mergin chunks
     let threadpool = ThreadPool::new(config.threads);
 
     // Create a chunk iterator over the input stream
     let mut input_chunks = Chunks::new(input, (config.buffer_size / config.threads).min(chunk::MAX_CHUNK_SIZE), config.clone());
 
-    // Sort all chunks and write them to small temporary files
-    let mut sorted_files = sort::sort(&mut input_chunks, &threadpool, tmp_dir, &config);
+    // Sort all chunks and write them to small temporary files, then keep
+    // merging until the amount of files is small enough
+    let sorted_files = sort::sort(&mut input_chunks, &threadpool, tmp_dir, &config).and_then(|mut sorted_files| {
+        while sorted_files.len() > config.chunk_size {
+            sorted_files = merge::merge(sorted_files, &threadpool, tmp_dir, &config)?;
+        }
+        Ok(sorted_files)
+    });
 
-    // Keep merging until the amount of files is small enough
-    while sorted_files.len() > config.chunk_size {
-        sorted_files = merge::merge(sorted_files, &threadpool, tmp_dir, &config);
+    // Let the other jobs end before the caller removes the temporary directory
+    if sorted_files.is_err() {
+        threadpool.join();
     }
 
     // Merge all temporary files into the output stream
-    merge::merge_and_write(sorted_files, output, config);
+    merge::merge_and_write(sorted_files?, output, config);
+
+    Ok(())
 }

@@ -1,5 +1,6 @@
 use std::sync::mpsc::channel;
-use std::io::Write;
+use std::io::{self, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::cmp::{min, max};
 
 use bytesize::MB;
@@ -13,7 +14,7 @@ pub fn merge(
     sorter_pool: &ThreadPool,
     tmp_dir: &mut TmpDir,
     config: &Configuration
-) -> Vec<ClosedTmpFile> {
+) -> io::Result<Vec<ClosedTmpFile>> {
     let (file_sender, file_reciever) = channel();
 
     let mut tmp_files: Vec<ClosedTmpFile> = vec![];
@@ -34,8 +35,8 @@ pub fn merge(
         let config = config.clone();
 
         sorter_pool.execute(move || {
-            merge_and_write(file_batch, &mut tmp_file, config);
-            let _ = sender.send(tmp_file.close());
+            let merged = catch_unwind(AssertUnwindSafe(|| merge_and_write(file_batch, &mut tmp_file, config)));
+            let _ = sender.send(merged.map(|_| tmp_file.close()));
         });
     }
 
@@ -43,10 +44,11 @@ pub fn merge(
 
     // While there is at least a single sender connected to this receiver
     while let Ok(file) = file_reciever.recv() {
-        tmp_files.push(file);
+        // A job that panicked, for example on a full disk, sends no file
+        tmp_files.push(file.map_err(|_| io::Error::other("a merge job failed"))?);
     }
 
-    return tmp_files;
+    return Ok(tmp_files);
 }
 
 pub fn merge_and_write(files: Vec<ClosedTmpFile>, file: &mut impl Write, config: Configuration) {
