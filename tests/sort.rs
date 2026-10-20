@@ -273,3 +273,13 @@ fn test_rejects_zero_threads() {
     assert!(failed);
     assert!(stderr.contains("at least one thread is needed"), "{}", stderr);
 }
+
+#[test]
+fn test_rejects_a_delimiter_that_is_not_one_ascii_character() {
+    for delimiter in ["\u{a7}", "ab", ""] {
+        let (failed, stderr) = sorter_fails(&["-f", "2", "-d", delimiter]);
+
+        assert!(failed, "-d {:?}", delimiter);
+        assert!(stderr.contains("the delimiter must be one ASCII character"), "{}", stderr);
+    }
+}

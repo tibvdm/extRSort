@@ -64,7 +64,11 @@ pub struct SortArgs {
 }
 
 fn parse_delimiter(s: &str) -> Result<u8, String> {
-    s.chars().next().ok_or_else(|| "Invalid delimiter".to_string()).map(|c| c as u8)
+    // The delimiter is compared as one byte, so it has to be one ASCII character
+    match s.as_bytes() {
+        [byte] if byte.is_ascii() => Ok(*byte),
+        _ => Err("the delimiter must be one ASCII character".to_string())
+    }
 }
 
 fn parse_threads(s: &str) -> Result<usize, String> {
